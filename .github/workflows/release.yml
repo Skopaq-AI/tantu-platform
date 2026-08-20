@@ -1,0 +1,38 @@
+name: release
+on:
+  push: { branches: [main] }
+  workflow_dispatch:
+permissions: { contents: write, packages: write, id-token: write }
+jobs:
+  semantic-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0, token: ${{ secrets.GITHUB_TOKEN }} }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm install -g semantic-release @semantic-release/changelog @semantic-release/git @semantic-release/exec
+      - run: semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        continue-on-error: true
+      - name: Per-service version bump
+        run: |
+          # Fallback: bump VERSION files from git tags
+          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.1.0")
+          VER=${TAG#v}
+          for svc in adapter-fabric edge-perception reasoning-copilot orchestrator api-gateway frontend; do
+            echo "$VER" > services/$svc/VERSION 2>/dev/null || echo "$VER" > $svc/VERSION 2>/dev/null || true
+            echo "$VER" > VERSION 2>/dev/null || true
+          done
+          echo "version=$VER" >> $GITHUB_OUTPUT
+        id: ver
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          generate_release_notes: true
+          files: |
+            infra/k8s/*.yaml
+        continue-on-error: true

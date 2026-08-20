@@ -1,0 +1,116 @@
+# TANTU — Helm values (base) — Autopilot + Gateway API + Argo Rollouts canary
+# Image pulls from Artifact Registry: asia-south1-docker.pkg.dev/<project>/tantu/<service>:<tag>
+# Deploy via: helm upgrade --install tantu ./helm/tantu -f infra/k8s/values.yaml -f infra/k8s/values-<env>.yaml
+
+global:
+  projectId: "" # injected via --set global.projectId=$PROJECT_ID
+  region: asia-south1
+  env: dev
+  registry: asia-south1-docker.pkg.dev/PROJECT_ID/tantu
+
+# ── Backend API (FastAPI) — Rollout with canary ──
+backend:
+  replicaCount: 2
+  image:
+    repository: asia-south1-docker.pkg.dev/PROJECT_ID/tantu/backend
+    tag: latest # override: --set backend.image.tag=$COMMIT_SHA
+    pullPolicy: Always
+  serviceAccount:
+    create: true
+    name: api
+    annotations:
+      iam.gke.io/gcp-service-account: tantu-dev-tantu-api@PROJECT_ID.iam.gserviceaccount.com
+
+  # Autopilot resource profile — requests == limits recommended
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+  # Spot for non-prod (Autopilot compute class), on-demand for prod
+  nodeSelector:
+    cloud.google.com/compute-class: Scale-Out # Spot — overridden to Balanced/on-demand in prod
+  tolerations:
+    - key: cloud.google.com/compute-class
+      operator: Equal
+      value: Scale-Out
+      effect: NoSchedule
+
+  env:
+    - name: ENV
+      value: dev
+    - name: POSTGRES_HOST
+      valueFrom:
+        secretKeyRef: { name: tantu-secrets, key: postgres-host }
+    - name: REDIS_HOST
+      value: tantu-dev-redis
+    - name: QDRANT_URL
+      value: http://qdrant:6333
+  envFrom:
+    - secretRef: { name: tantu-secrets }
+
+  ports:
+    - name: http
+      containerPort: 8000
+      protocol: TCP
+
+  probes:
+    liveness: { httpGet: { path: /health, port: http }, initialDelaySeconds: 15, periodSeconds: 10 }
+    readiness: { httpGet: { path: /health, port: http }, initialDelaySeconds: 5, periodSeconds: 5 }
+
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities: { drop: ["ALL"] }
+
+  # Autoscaling — HPA (Autopilot handles node provisioning)
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+    behavior:
+      scaleUp: { stabilizationWindowSeconds: 60, policies: [{ type: Pods, value: 2, periodSeconds: 60 }] }
+      scaleDown: { stabilizationWindowSeconds: 300, policies: [{ type: Pods, value: 1, periodSeconds: 60 }] }
+
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8000
+
+# ── Frontend (Next.js) — standard Deployment behind same Gateway ──
+frontend:
+  replicaCount: 2
+  image:
+    repository: asia-south1-docker.pkg.dev/PROJECT_ID/tantu/frontend
+    tag: latest
+    pullPolicy: Always
+  serviceAccount:
+    create: false
+  resources:
+    requests: { cpu: 300m, memory: 512Mi }
+    limits: { cpu: 600m, memory: 1Gi }
+  nodeSelector:
+    cloud.google.com/compute-class: Scale-Out
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 3000
+  autoscaling: { enabled: true, minReplicas: 2, maxReplicas: 6, targetCPUUtilizationPercentage: 70 }
+
+# ── Qdrant is deployed via Terraform helm_release; values here are for reference/sync only ──
+qdrant:
+  enabled: true
+  replicaCount: 1 # 3 in prod (see values-prod.yaml)
+
+# ── Argo Rollouts — controller installed via Terraform or via Helm here ──
+argoRollouts:
+  enabled: true
+  controller:
+    replicas: 1

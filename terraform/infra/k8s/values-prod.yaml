@@ -1,0 +1,48 @@
+# TANTU — prod overrides — HA, on-demand, conservative autoscale, canary gates
+global:
+  env: prod
+
+backend:
+  replicaCount: 3
+  resources:
+    requests: { cpu: 1000m, memory: 1Gi }
+    limits: { cpu: 2000m, memory: 2Gi }
+  # Prod uses on-demand (Balanced) — no Spot toleration
+  nodeSelector:
+    cloud.google.com/compute-class: Balanced
+  tolerations: [] # no Spot toleration in prod
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 65
+    targetMemoryUtilizationPercentage: 75
+  env:
+    - name: ENV
+      value: prod
+    - name: LOG_LEVEL
+      value: info
+  # PodDisruptionBudget for HA
+  pdb:
+    enabled: true
+    minAvailable: 2
+
+frontend:
+  replicaCount: 3
+  resources:
+    requests: { cpu: 500m, memory: 512Mi }
+    limits: { cpu: 1000m, memory: 1Gi }
+  nodeSelector:
+    cloud.google.com/compute-class: Balanced
+  pdb: { enabled: true, minAvailable: 2 }
+
+qdrant:
+  replicaCount: 3
+  persistence: { size: 50Gi }
+  antiAffinity: required
+
+# Argo Rollouts — automated analysis (error rate, p95 latency) before promotion
+argoRollouts:
+  analysis:
+    enabled: true
+    # AnalysisTemplate refs: error-rate, latency-p95 (see rollout.yaml)

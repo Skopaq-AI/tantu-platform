@@ -1,0 +1,42 @@
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /services/adapter-fabric
+    schedule: { interval: weekly }
+    labels: [deps, python]
+  - package-ecosystem: pip
+    directory: /services/edge-perception
+    schedule: { interval: weekly }
+    labels: [deps, python]
+  - package-ecosystem: pip
+    directory: /services/reasoning-copilot
+    schedule: { interval: weekly }
+    labels: [deps, python]
+  - package-ecosystem: pip
+    directory: /services/orchestrator
+    schedule: { interval: weekly }
+    labels: [deps, python]
+  - package-ecosystem: pip
+    directory: /services/api-gateway
+    schedule: { interval: weekly }
+    labels: [deps, python]
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule: { interval: weekly }
+    labels: [deps, frontend]
+  - package-ecosystem: docker
+    directory: /services/adapter-fabric
+    schedule: { interval: weekly }
+    labels: [deps, docker]
+  - package-ecosystem: docker
+    directory: /services/edge-perception
+    schedule: { interval: weekly }
+    labels: [deps, docker]
+  - package-ecosystem: docker
+    directory: /frontend
+    schedule: { interval: weekly }
+    labels: [deps, docker]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    labels: [deps, ci]

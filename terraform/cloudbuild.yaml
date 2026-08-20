@@ -1,0 +1,63 @@
+# TANTU — Cloud Build pipeline (also usable outside Terraform)
+# Trigger: on push to main, build + push to Artifact Registry, then optional deploy via Helm
+# Variables: _REGION, _REPO, _ENV (set in trigger)
+
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build-backend
+    args:
+      - build
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:$COMMIT_SHA'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:latest'
+      - '-f'
+      - backend/Dockerfile
+      - .
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push-backend
+    args: ['push', '--all-tags', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build-frontend
+    args:
+      - build
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:$COMMIT_SHA'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:latest'
+      - '-f'
+      - frontend/Dockerfile
+      - .
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push-frontend
+    args: ['push', '--all-tags', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend']
+
+  # Optional: deploy via Helm + Argo Rollouts (requires kubectl + helm + GKE auth)
+  # - name: 'gcr.io/cloud-builders/gcloud'
+  #   id: deploy
+  #   entrypoint: bash
+  #   args:
+  #     - -c
+  #     - |
+  #       gcloud container clusters get-credentials tantu-$$_ENV-gke --region $$_REGION --project $$PROJECT_ID
+  #       helm upgrade --install tantu ./terraform/infra/k8s/helm/tantu \
+  #         -n tantu --create-namespace \
+  #         -f terraform/infra/k8s/values.yaml \
+  #         -f terraform/infra/k8s/values-$$_ENV.yaml \
+  #         --set backend.image.tag=$$COMMIT_SHA --set frontend.image.tag=$$COMMIT_SHA
+
+images:
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:$COMMIT_SHA'
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:$COMMIT_SHA'
+
+substitutions:
+  _REGION: asia-south1
+  _REPO: tantu
+  _ENV: dev
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8

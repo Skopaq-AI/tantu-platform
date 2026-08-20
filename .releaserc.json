@@ -1,0 +1,28 @@
+{
+  "branches": ["main"],
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    [
+      "@semantic-release/changelog",
+      {
+        "changelogFile": "CHANGELOG.md"
+      }
+    ],
+    [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "./scripts/version.sh set ${nextRelease.version}",
+        "publishCmd": "echo \"version ${nextRelease.version} prepared\""
+      }
+    ],
+    [
+      "@semantic-release/git",
+      {
+        "assets": [".version", "services/*/VERSION", "services/*/pyproject.toml", "frontend/package.json", "CHANGELOG.md"],
+        "message": "chore(release): v${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+      }
+    ],
+    "@semantic-release/github"
+  ]
+}

@@ -1,0 +1,17 @@
+# gitleaks config — allow example secrets, block real ones
+title = "TANTU gitleaks config"
+
+[allowlist]
+  description = "allowlist for scaffold/example"
+  paths = [
+    '''gitleaks/testdata''',
+    '''\.env\.example''',
+    '''docs/.*''',
+    '''.*\.md'''
+  ]
+  regexes = [
+    '''tantu_dev_only_change_me''',
+    '''dev-only-key-replace-in-prod''',
+    '''example''',
+    '''placeholder'''
+  ]

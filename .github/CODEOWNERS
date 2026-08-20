@@ -1,0 +1,11 @@
+# CODEOWNERS — replace @OWNER placeholders with real handles/teams
+*                         @OWNER/platform-leads
+/services/adapter-fabric/ @OWNER/adapter-team
+/services/edge-perception/ @OWNER/edge-team
+/services/reasoning-copilot/ @OWNER/genai-team
+/services/orchestrator/   @OWNER/orchestrator-team
+/services/api-gateway/    @OWNER/gateway-team
+/frontend/                @OWNER/frontend-team
+/infra/                   @OWNER/infra-team
+/docs/                    @OWNER/platform-leads
+.github/workflows/        @OWNER/infra-team

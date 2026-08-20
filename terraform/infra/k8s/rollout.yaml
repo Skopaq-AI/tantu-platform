@@ -1,0 +1,125 @@
+# TANTU — Argo Rollouts gradual canary via Gateway API (HTTPRoute weights)
+# Strategy: 10% -> 30% -> 60% -> 100% with automated analysis (error rate, latency)
+# Install controller: helm upgrade --install argo-rollouts argo/argo-rollouts -n argo-rollouts --create-namespace
+# Or: kubectl create namespace argo-rollouts && kubectl apply -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml
+
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: tantu-backend
+  namespace: tantu
+spec:
+  replicas: 3
+  revisionHistoryLimit: 3
+  strategy:
+    canary:
+      # Traffic routing via Gateway API — Argo Rollouts manages HTTPRoute weights
+      trafficRouting:
+        plugins:
+          argoproj-labs/gatewayAPI:
+            httpRoute: tantu-routes
+            namespace: tantu
+      steps:
+        - setWeight: 10
+        - pause: { duration: 2m }
+        - analysis:
+            templates: [{ templateName: error-rate }]
+            args: [{ name: service-name, value: tantu-backend }]
+        - setWeight: 30
+        - pause: { duration: 5m }
+        - analysis:
+            templates: [{ templateName: latency-p95 }]
+        - setWeight: 60
+        - pause: { duration: 5m }
+        - setWeight: 80
+        - pause: { duration: 2m }
+      # On failure: automatic rollback
+      analysis:
+        templates: [{ templateName: error-rate }]
+        args: [{ name: service-name, value: tantu-backend }]
+      antiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution: {}
+  selector:
+    matchLabels: { app: tantu-backend }
+  template:
+    metadata:
+      labels: { app: tantu-backend }
+    spec:
+      serviceAccountName: api
+      containers:
+        - name: api
+          image: asia-south1-docker.pkg.dev/PROJECT_ID/tantu/backend:latest
+          ports: [{ containerPort: 8000, name: http }]
+          envFrom: [{ secretRef: { name: tantu-secrets } }]
+          livenessProbe: { httpGet: { path: /health, port: 8000 }, initialDelaySeconds: 10 }
+          readinessProbe: { httpGet: { path: /health, port: 8000 }, initialDelaySeconds: 5 }
+          resources:
+            requests: { cpu: 500m, memory: 512Mi }
+            limits: { cpu: 1000m, memory: 1Gi }
+          securityContext:
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+      # Autopilot compute class via nodeSelector (dev = Spot, prod = Balanced)
+      nodeSelector:
+        cloud.google.com/compute-class: Balanced
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: error-rate
+  namespace: tantu
+spec:
+  args: [{ name: service-name }]
+  metrics:
+    - name: error-rate
+      interval: 30s
+      count: 5
+      successCondition: result[0] <= 0.05 # <5% 5xx
+      failureLimit: 2
+      provider:
+        prometheus:
+          address: http://prometheus.monitoring.svc:9090
+          query: |
+            sum(rate(http_requests_total{job="{{args.service-name}}",code=~"5.."}[2m]))
+            /
+            sum(rate(http_requests_total{job="{{args.service-name}}"}[2m]))
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: latency-p95
+  namespace: tantu
+spec:
+  metrics:
+    - name: latency-p95
+      interval: 30s
+      count: 5
+      successCondition: result[0] <= 500 # p95 <500ms
+      failureLimit: 2
+      provider:
+        prometheus:
+          address: http://prometheus.monitoring.svc:9090
+          query: |
+            histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job="tantu-backend"}[2m])) by (le))
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tantu-backend
+  namespace: tantu
+spec:
+  selector: { app: tantu-backend }
+  ports: [{ name: http, port: 80, targetPort: 8000 }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tantu-frontend
+  namespace: tantu
+spec:
+  selector: { app: tantu-frontend }
+  ports: [{ port: 80, targetPort: 3000 }]
+---
+# For dev (no analysis): set steps to simple pause-only or use `kubectl argo rollouts promote`

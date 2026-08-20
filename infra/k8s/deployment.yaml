@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: tantu-backend }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: tantu-backend } }
+  template:
+    metadata: { labels: { app: tantu-backend } }
+    spec:
+      containers:
+      - name: api
+        image: tantu-backend:0.1.0
+        ports: [{containerPort: 8000}]
+        envFrom: [{secretRef: {name: tantu-secrets}}]
+        livenessProbe: { httpGet: { path: /health, port: 8000 }, initialDelaySeconds: 10 }
+        readinessProbe: { httpGet: { path: /health, port: 8000 }, initialDelaySeconds: 5 }
+        resources: { requests: { cpu: "200m", memory: "256Mi" }, limits: { cpu: "1000m", memory: "1Gi" } }
+        securityContext: { readOnlyRootFilesystem: true, runAsNonRoot: true, allowPrivilegeEscalation: false }

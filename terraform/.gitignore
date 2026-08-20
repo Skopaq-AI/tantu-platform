@@ -1,0 +1,24 @@
+# Terraform
+.terraform/
+.terraform.lock.hcl
+tfplan
+tfplan-*
+terraform.tfstate
+terraform.tfstate.*
+*.tfvars.json
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Backend per-env (contains bucket names — not secret but per-env)
+backend.*.hcl
+!backend.hcl
+
+# Secrets
+*.pem
+*.key
+secrets.auto.tfvars

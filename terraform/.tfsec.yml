@@ -1,0 +1,5 @@
+# tfsec / trivy config — minimal ignores, explicit
+# Run: tfsec .  or  trivy config .
+includes: []
+excludes: []
+severity: HIGH
