@@ -111,8 +111,8 @@ variable "redis_memory_size_gb" {
 }
 
 variable "redis_version" {
-  type        = string
-  default     = "REDIS_7_0"
+  type    = string
+  default = "REDIS_7_0"
 }
 
 variable "redis_tier" {
@@ -123,8 +123,8 @@ variable "redis_tier" {
 
 # ── Artifact Registry ──
 variable "registry_format" {
-  type        = string
-  default     = "DOCKER"
+  type    = string
+  default = "DOCKER"
 }
 
 # ── State / Security ──
@@ -166,8 +166,8 @@ variable "github_repo" {
 }
 
 variable "github_branch_regex" {
-  type        = string
-  default     = "^main$"
+  type    = string
+  default = "^main$"
 }
 
 # ── Tags / Cost ──
@@ -175,4 +175,10 @@ variable "enable_committed_use_discounts" {
   description = "Flag for documentation/CUD purchase reminder — CUDs are purchased out-of-band, not via TF."
   type        = bool
   default     = false
+}
+
+variable "enable_qdrant_helm" {
+  description = "Enable Helm-based Qdrant on GKE. Set false for bootstrap phase before cluster exists."
+  type        = bool
+  default     = true
 }

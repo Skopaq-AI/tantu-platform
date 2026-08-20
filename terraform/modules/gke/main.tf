@@ -3,9 +3,9 @@
 # Security: private cluster, Workload Identity, Shielded Nodes, Binary Authorization stub
 
 resource "google_container_cluster" "autopilot" {
-  name             = var.cluster_name
-  project          = var.project_id
-  location         = var.region
+  name                = var.cluster_name
+  project             = var.project_id
+  location            = var.region
   deletion_protection = var.deletion_protection && var.env == "prod"
 
   enable_autopilot = true
@@ -100,8 +100,8 @@ resource "null_resource" "rollouts_anchor" {
 # Manifest lives in infra/k8s/gateway.yaml (Gateway + HTTPRoute).
 # Terraform creates a static global IP that the Gateway will use via annotation.
 resource "google_compute_global_address" "gateway_ip" {
-  name    = "${var.cluster_name}-gateway-ip"
-  project = var.project_id
+  name        = "${var.cluster_name}-gateway-ip"
+  project     = var.project_id
   description = "Static IP for GKE Gateway (${var.env})"
 }
 

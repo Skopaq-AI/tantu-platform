@@ -1,0 +1,25 @@
+{{- if .Values.frontend.enabled | default true }}
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: tantu-frontend, namespace: {{ .Release.Namespace }} }
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  selector: { matchLabels: { app: tantu-frontend } }
+  template:
+    metadata: { labels: { app: tantu-frontend } }
+    spec:
+      containers:
+        - name: web
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+          ports: [{ containerPort: 3000 }]
+          resources: {{- toYaml .Values.frontend.resources | nindent 12 }}
+          securityContext: { runAsNonRoot: true, readOnlyRootFilesystem: true, allowPrivilegeEscalation: false }
+      nodeSelector: {{- toYaml .Values.frontend.nodeSelector | nindent 8 }}
+---
+apiVersion: v1
+kind: Service
+metadata: { name: tantu-frontend, namespace: {{ .Release.Namespace }} }
+spec:
+  selector: { app: tantu-frontend }
+  ports: [{ port: {{ .Values.frontend.service.port }}, targetPort: 3000 }]
+{{- end }}

@@ -88,7 +88,7 @@ output "cloudbuild_trigger_id" {
 }
 
 output "qdrant_service" {
-  value       = module.qdrant.service_name
+  value       = try(module.qdrant[0].service_name, null)
   description = "Qdrant k8s service name (in-cluster DNS)"
 }
 

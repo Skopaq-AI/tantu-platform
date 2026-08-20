@@ -12,10 +12,10 @@ gke_release_channel = "REGULAR"
 enable_spot_nodes   = true
 
 # Cloud SQL — cost-optimized, no HA in dev
-postgres_version           = "POSTGRES_16"
-postgres_tier              = "db-custom-1-3840"
-postgres_disk_size_gb      = 20
-postgres_ha_enabled        = false
+postgres_version             = "POSTGRES_16"
+postgres_tier                = "db-custom-1-3840"
+postgres_disk_size_gb        = 20
+postgres_ha_enabled          = false
 postgres_deletion_protection = false
 
 # Redis — BASIC in dev to save cost (override to STANDARD_HA if you test failover)
@@ -24,8 +24,8 @@ redis_version        = "REDIS_7_0"
 redis_tier           = "BASIC"
 
 # No GitHub trigger in dev by default (set to enable)
-github_owner       = ""
-github_repo        = ""
+github_owner        = ""
+github_repo         = ""
 github_branch_regex = "^main$"
 
 # State bucket — set after bootstrap: gsutil mb -l asia-south1 gs://tantu-dev-XXXX-tfstate

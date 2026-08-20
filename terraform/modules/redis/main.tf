@@ -12,7 +12,7 @@ resource "google_redis_instance" "redis" {
   connect_mode       = "PRIVATE_SERVICE_ACCESS"
 
   # Security hardening
-  auth_enabled   = true
+  auth_enabled            = true
   transit_encryption_mode = "SERVER_AUTHENTICATION"
 
   maintenance_policy {
@@ -36,8 +36,12 @@ resource "google_redis_instance" "redis" {
 resource "google_secret_manager_secret" "redis_auth" {
   secret_id = "tantu-${var.env}-redis-auth"
   project   = var.project_id
-  replication { auto {} }
-  labels = { env = var.env }
+  replication {
+    auto {}
+  }
+  labels = {
+    env = var.env
+  }
 }
 
 resource "google_secret_manager_secret_version" "redis_auth_version" {

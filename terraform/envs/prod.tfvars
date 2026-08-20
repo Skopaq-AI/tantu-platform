@@ -12,11 +12,11 @@ gke_release_channel = "REGULAR"
 enable_spot_nodes   = false
 
 # Cloud SQL — HA regional, larger tier, deletion protection ON
-postgres_version              = "POSTGRES_16"
-postgres_tier                 = "db-custom-2-7680" # 2 vCPU, 7.5GB — scale via console/TF
-postgres_disk_size_gb         = 100
-postgres_ha_enabled           = true
-postgres_deletion_protection  = true
+postgres_version             = "POSTGRES_16"
+postgres_tier                = "db-custom-2-7680" # 2 vCPU, 7.5GB — scale via console/TF
+postgres_disk_size_gb        = 100
+postgres_ha_enabled          = true
+postgres_deletion_protection = true
 
 # Redis — HA
 redis_memory_size_gb = 5

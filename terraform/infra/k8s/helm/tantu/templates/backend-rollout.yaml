@@ -1,0 +1,70 @@
+{{- if .Values.backend.enabled | default true }}
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: tantu-backend
+  namespace: {{ .Release.Namespace }}
+  labels: { app: tantu-backend, env: {{ .Values.global.env }} }
+spec:
+  replicas: {{ .Values.backend.replicaCount }}
+  strategy:
+    canary:
+      trafficRouting:
+        plugins:
+          argoproj-labs/gatewayAPI:
+            httpRoute: tantu-routes
+            namespace: {{ .Release.Namespace }}
+      steps:
+        - setWeight: 10
+        - pause: { duration: 2m }
+        - analysis: { templates: [{ templateName: error-rate }], args: [{ name: service-name, value: tantu-backend }] }
+        - setWeight: 30
+        - pause: { duration: 5m }
+        - setWeight: 60
+        - pause: { duration: 5m }
+        - setWeight: 80
+        - pause: { duration: 2m }
+  selector: { matchLabels: { app: tantu-backend } }
+  template:
+    metadata: { labels: { app: tantu-backend } }
+    spec:
+      serviceAccountName: {{ .Values.backend.serviceAccount.name }}
+      containers:
+        - name: api
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          ports: [{ containerPort: 8000, name: http }]
+          envFrom: [{ secretRef: { name: tantu-secrets } }]
+          livenessProbe: {{- toYaml .Values.backend.probes.liveness | nindent 12 }}
+          readinessProbe: {{- toYaml .Values.backend.probes.readiness | nindent 12 }}
+          resources: {{- toYaml .Values.backend.resources | nindent 12 }}
+          securityContext: {{- toYaml .Values.backend.securityContext | nindent 12 }}
+      nodeSelector: {{- toYaml .Values.backend.nodeSelector | nindent 8 }}
+      {{- with .Values.backend.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata: { name: tantu-backend, namespace: {{ .Release.Namespace }} }
+spec:
+  selector: { app: tantu-backend }
+  ports: [{ name: http, port: {{ .Values.backend.service.port }}, targetPort: 8000 }]
+---
+{{- if .Values.backend.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: tantu-backend, namespace: {{ .Release.Namespace }} }
+spec:
+  scaleTargetRef: { apiVersion: argoproj.io/v1alpha1, kind: Rollout, name: tantu-backend }
+  minReplicas: {{ .Values.backend.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.backend.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: {{ .Values.backend.autoscaling.targetCPUUtilizationPercentage }} } }
+    {{- if .Values.backend.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource: { name: memory, target: { type: Utilization, averageUtilization: {{ .Values.backend.autoscaling.targetMemoryUtilizationPercentage }} } }
+    {{- end }}
+{{- end }}
+{{- end }}

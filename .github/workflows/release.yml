@@ -1,38 +1,303 @@
-name: release
+name: Release
+
 on:
-  push: { branches: [main] }
+  push:
+    branches: [main]
   workflow_dispatch:
-permissions: { contents: write, packages: write, id-token: write }
+    inputs:
+      bump:
+        description: "Force bump (patch|minor|major|auto)"
+        required: false
+        default: auto
+        type: choice
+        options: [auto, patch, minor, major, none]
+      dry_run:
+        description: "Dry run (no tag/push)"
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+  security-events: write
+
+env:
+  PYTHON_VERSION: "3.11"
+
 jobs:
-  semantic-release:
+  release:
+    name: semantic-release
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 0, token: ${{ secrets.GITHUB_TOKEN }} }
-      - uses: actions/setup-node@v4
-        with: { node-version: 20 }
-      - run: npm install -g semantic-release @semantic-release/changelog @semantic-release/git @semantic-release/exec
-      - run: semantic-release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        continue-on-error: true
-      - name: Per-service version bump
+      - name: Checkout (full history + tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
         run: |
-          # Fallback: bump VERSION files from git tags
-          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.1.0")
-          VER=${TAG#v}
-          for svc in adapter-fabric edge-perception reasoning-copilot orchestrator api-gateway frontend; do
-            echo "$VER" > services/$svc/VERSION 2>/dev/null || echo "$VER" > $svc/VERSION 2>/dev/null || true
-            echo "$VER" > VERSION 2>/dev/null || true
+          git config user.name  "tantu-release-bot"
+          git config user.email "release-bot@users.noreply.github.com"
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install release tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install "python-semantic-release==9.*"
+          npm install -g conventional-changelog-cli 2>/dev/null || true
+
+      - name: Resolve current and next version
+        id: semver
+        env:
+          FORCE_BUMP: ${{ inputs.bump || 'auto' }}
+        run: |
+          set -euo pipefail
+          CUR="$(tr -d ' \t\n\r' < .version 2>/dev/null || echo '0.1.0')"
+          LAST_TAG="$(git describe --tags --abbrev=0 2>/dev/null || echo 'v0.0.0')"
+          echo "Current .version: $CUR"
+          echo "Last tag: $LAST_TAG"
+          if git rev-parse "$LAST_TAG" >/dev/null 2>&1; then
+            RANGE="$LAST_TAG..HEAD"
+          else
+            RANGE="HEAD"
+          fi
+          echo "Range: $RANGE"
+          COMMITS="$(git log "$RANGE" --pretty=%B --no-merges || true)"
+          echo "--- commits in range ---"
+          echo "$COMMITS" | head -n 100
+          echo "------------------------"
+          BUMP="none"
+          if [ "$FORCE_BUMP" != "auto" ] && [ "$FORCE_BUMP" != "" ]; then
+            BUMP="$FORCE_BUMP"
+            echo "Force bump: $BUMP"
+          else
+            if echo "$COMMITS" | grep -qE 'BREAKING CHANGE|^[a-zA-Z!]+(\(.+\))?!:'; then
+              BUMP="major"
+            elif echo "$COMMITS" | grep -qE '^feat(\(.+\))?:'; then
+              BUMP="minor"
+            elif echo "$COMMITS" | grep -qE '^(fix|perf|refactor|revert)(\(.+\))?:'; then
+              BUMP="patch"
+            else
+              BUMP="none"
+            fi
+            echo "Auto-detected bump: $BUMP"
+          fi
+          if [ "$BUMP" = "none" ]; then
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "next_version=$CUR" >> "$GITHUB_OUTPUT"
+            echo "bump=none" >> "$GITHUB_OUTPUT"
+            echo "::notice::No conventional-commit bump detected — skipping release (use workflow_dispatch bump=major/minor/patch to force)"
+            exit 0
+          fi
+          NEXT="$(python3 -c "
+          import re
+          cur='$CUR'.strip().lstrip('v')
+          m=re.match(r'^(\d+)\.(\d+)\.(\d+)', cur)
+          maj,mi,pa=map(int,m.groups())
+          bump='$BUMP'
+          if bump=='major': maj+=1; mi=0; pa=0
+          elif bump=='minor': mi+=1; pa=0
+          elif bump=='patch': pa+=1
+          print(f'{maj}.{mi}.{pa}')
+          ")"
+          echo "should_release=true" >> "$GITHUB_OUTPUT"
+          echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
+          echo "current_version=$CUR" >> "$GITHUB_OUTPUT"
+          echo "next_version=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "last_tag=$LAST_TAG" >> "$GITHUB_OUTPUT"
+          echo "range=$RANGE" >> "$GITHUB_OUTPUT"
+          echo "Next version: $NEXT (bump=$BUMP)"
+
+      - name: Stop if no release
+        if: steps.semver.outputs.should_release != 'true'
+        run: echo "No release needed — exiting."
+
+      - name: Bump versions (scripts/version.sh)
+        if: steps.semver.outputs.should_release == 'true'
+        env:
+          NEXT: ${{ steps.semver.outputs.next_version }}
+        run: |
+          set -e
+          echo "Bumping to $NEXT via scripts/version.sh"
+          ./scripts/version.sh set "$NEXT"
+          ./scripts/version.sh check
+          git status --short
+
+      - name: Generate CHANGELOG.md
+        if: steps.semver.outputs.should_release == 'true'
+        env:
+          NEXT: ${{ steps.semver.outputs.next_version }}
+          LAST_TAG: ${{ steps.semver.outputs.last_tag }}
+        run: |
+          set -e
+          if command -v git-cliff >/dev/null 2>&1; then
+            git-cliff --tag "v$NEXT" --output CHANGELOG.md --strip all || git-cliff --tag "v$NEXT" > CHANGELOG.md || true
+            if ! head -n1 CHANGELOG.md | grep -q "Changelog"; then
+              printf "# Changelog\n\n## v%s — %s\n\n" "$NEXT" "$(date +%Y-%m-%d)" | cat - CHANGELOG.md > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
+            fi
+          elif command -v conventional-changelog >/dev/null 2>&1; then
+            conventional-changelog -p angular -i CHANGELOG.md -s -r 0 || true
+          else
+            RANGE="${LAST_TAG}..HEAD"
+            if ! git rev-parse "$LAST_TAG" >/dev/null 2>&1; then RANGE="HEAD"; fi
+            {
+              echo "# Changelog"
+              echo ""
+              if [ -f CHANGELOG.md ]; then cat CHANGELOG.md; echo ""; fi
+              echo "## v$NEXT — $(date +%Y-%m-%d)"
+              echo ""
+              git log "$RANGE" --pretty="- %s (%h)" --no-merges | head -n 100
+              echo ""
+            } > CHANGELOG.md.new
+            mv CHANGELOG.md.new CHANGELOG.md
+          fi
+          touch CHANGELOG.md
+          head -n 80 CHANGELOG.md
+          git add CHANGELOG.md .version services/*/VERSION services/*/pyproject.toml frontend/package.json || true
+
+      - name: Commit and tag
+        if: steps.semver.outputs.should_release == 'true' && inputs.dry_run != true
+        env:
+          NEXT: ${{ steps.semver.outputs.next_version }}
+          BUMP: ${{ steps.semver.outputs.bump }}
+        run: |
+          set -e
+          git add .version services/*/VERSION services/*/pyproject.toml frontend/package.json CHANGELOG.md
+          git add backend/pyproject.toml 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "Nothing to commit (unexpected)"
+          else
+            git commit -m "chore(release): v$NEXT ($BUMP)"
+          fi
+          git tag -a "v$NEXT" -m "Release v$NEXT"
+          echo "Created tag v$NEXT"
+          git log --oneline -5
+          git show --stat HEAD || true
+
+      - name: Push commit and tag
+        if: steps.semver.outputs.should_release == 'true' && inputs.dry_run != true
+        run: |
+          git push origin HEAD:main
+          git push origin "v${{ steps.semver.outputs.next_version }}"
+
+      - name: Generate SBOM — adapter-fabric
+        if: steps.semver.outputs.should_release == 'true'
+        uses: anchore/sbom-action@v0
+        with:
+          path: ./services/adapter-fabric
+          format: spdx-json
+          output-file: sbom-adapter-fabric.spdx.json
+
+      - name: Generate SBOM — edge-perception
+        if: steps.semver.outputs.should_release == 'true'
+        uses: anchore/sbom-action@v0
+        with:
+          path: ./services/edge-perception
+          format: spdx-json
+          output-file: sbom-edge-perception.spdx.json
+
+      - name: Generate SBOM — reasoning-copilot
+        if: steps.semver.outputs.should_release == 'true'
+        uses: anchore/sbom-action@v0
+        with:
+          path: ./services/reasoning-copilot
+          format: spdx-json
+          output-file: sbom-reasoning-copilot.spdx.json
+
+      - name: Generate SBOM — orchestrator
+        if: steps.semver.outputs.should_release == 'true'
+        uses: anchore/sbom-action@v0
+        with:
+          path: ./services/orchestrator
+          format: spdx-json
+          output-file: sbom-orchestrator.spdx.json
+
+      - name: Generate SBOM — api-gateway
+        if: steps.semver.outputs.should_release == 'true'
+        uses: anchore/sbom-action@v0
+        with:
+          path: ./services/api-gateway
+          format: spdx-json
+          output-file: sbom-api-gateway.spdx.json
+
+      - name: Generate SBOM — frontend
+        if: steps.semver.outputs.should_release == 'true'
+        uses: anchore/sbom-action@v0
+        with:
+          path: ./frontend
+          format: spdx-json
+          output-file: sbom-frontend.spdx.json
+
+      - name: Upload SBOM artifacts
+        if: steps.semver.outputs.should_release == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sboms-v${{ steps.semver.outputs.next_version }}
+          path: sbom-*.spdx.json
+          if-no-files-found: error
+
+      - name: Install Cosign
+        if: steps.semver.outputs.should_release == 'true' && inputs.dry_run != true
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: v2.4.1
+
+      - name: Cosign sign SBOMs (keyless)
+        if: steps.semver.outputs.should_release == 'true' && inputs.dry_run != true
+        run: |
+          set -e
+          for f in sbom-*.spdx.json; do
+            [ -f "$f" ] || continue
+            echo "Signing $f ..."
+            cosign sign-blob --yes --output-signature "$f.sig" --output-certificate "$f.pem" "$f"
+            echo "Signed $f → $f.sig"
           done
-          echo "version=$VER" >> $GITHUB_OUTPUT
-        id: ver
+          ls -lh sbom-*
+
+      - name: Cosign sign tag
+        if: steps.semver.outputs.should_release == 'true' && inputs.dry_run != true
+        run: |
+          NEXT="${{ steps.semver.outputs.next_version }}"
+          TAG_OBJ="$(git rev-parse "v$NEXT")"
+          echo -n "$TAG_OBJ" | cosign sign-blob --yes --output-signature "v$NEXT.tag.sig" --output-certificate "v$NEXT.tag.pem" --bundle "v$NEXT.tag.bundle" -
+          echo "Tag v$NEXT signed"
+        continue-on-error: true
+
       - name: Create GitHub Release
+        if: steps.semver.outputs.should_release == 'true' && inputs.dry_run != true
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.ver.outputs.version }}
+          tag_name: v${{ steps.semver.outputs.next_version }}
+          name: v${{ steps.semver.outputs.next_version }}
+          body_path: CHANGELOG.md
           generate_release_notes: true
           files: |
-            infra/k8s/*.yaml
-        continue-on-error: true
+            sbom-*.spdx.json
+            sbom-*.spdx.json.sig
+            sbom-*.spdx.json.pem
+            v*.tag.sig
+            v*.tag.pem
+            v*.tag.bundle
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Release summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Should release: ${{ steps.semver.outputs.should_release }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Bump: ${{ steps.semver.outputs.bump }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Current: ${{ steps.semver.outputs.current_version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Next: ${{ steps.semver.outputs.next_version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Range: ${{ steps.semver.outputs.range }}" >> "$GITHUB_STEP_SUMMARY"

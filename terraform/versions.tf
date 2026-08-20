@@ -2,7 +2,7 @@
 # Follows best practices: pinned providers, >= Terraform 1.5 for import blocks & checks
 
 terraform {
-  required_version = ">= 1.6.0"
+  required_version = ">= 1.5.0"
 
   required_providers {
     google = {

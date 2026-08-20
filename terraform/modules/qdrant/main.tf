@@ -60,11 +60,11 @@ resource "helm_release" "qdrant" {
 
       # Liveness/Readiness — HTTP checks
       livenessProbe = {
-        httpGet = { path = "/", port = 6333 }
+        httpGet             = { path = "/", port = 6333 }
         initialDelaySeconds = 30
       }
       readinessProbe = {
-        httpGet = { path = "/readyz", port = 6333 }
+        httpGet             = { path = "/readyz", port = 6333 }
         initialDelaySeconds = 10
       }
 
@@ -103,8 +103,12 @@ resource "kubernetes_secret" "qdrant_api_key" {
 resource "google_secret_manager_secret" "qdrant_api_key" {
   secret_id = "tantu-${var.env}-qdrant-api-key"
   project   = var.project_id
-  replication { auto {} }
-  labels = { env = var.env }
+  replication {
+    auto {}
+  }
+  labels = {
+    env = var.env
+  }
 }
 
 resource "google_secret_manager_secret_version" "qdrant_api_key_version" {

@@ -18,12 +18,12 @@ locals {
 module "vpc" {
   source = "./modules/vpc"
 
-  project_id                          = var.project_id
-  region                              = var.region
-  env                                 = var.env
-  vpc_name                            = local.network_name
-  cidr                                = var.vpc_cidr
-  enable_private_service_networking   = var.enable_private_service_networking
+  project_id                        = var.project_id
+  region                            = var.region
+  env                               = var.env
+  vpc_name                          = local.network_name
+  cidr                              = var.vpc_cidr
+  enable_private_service_networking = var.enable_private_service_networking
 
   depends_on = [google_project_service.required]
 }
@@ -70,14 +70,14 @@ module "postgres" {
 module "redis" {
   source = "./modules/redis"
 
-  project_id   = var.project_id
-  region       = var.region
-  env          = var.env
-  vpc_id       = module.vpc.vpc_id
-  network      = module.vpc.vpc_self_link
-  memory_size_gb = var.redis_memory_size_gb
-  redis_version  = var.redis_version
-  tier           = var.redis_tier
+  project_id            = var.project_id
+  region                = var.region
+  env                   = var.env
+  vpc_id                = module.vpc.vpc_id
+  network               = module.vpc.vpc_self_link
+  memory_size_gb        = var.redis_memory_size_gb
+  redis_version         = var.redis_version
+  tier                  = var.redis_tier
   private_service_range = module.vpc.private_service_range
 
   depends_on = [module.vpc]
@@ -89,16 +89,16 @@ module "redis" {
 module "iam" {
   source = "./modules/iam"
 
-  project_id          = var.project_id
-  region              = var.region
-  env                 = var.env
-  cluster_name        = local.cluster_name
-  artifact_repo_name  = module.registry.repository_name
+  project_id         = var.project_id
+  region             = var.region
+  env                = var.env
+  cluster_name       = local.cluster_name
+  artifact_repo_name = module.registry.repository_name
   # Namespace/KSAs that will be bound — must match Helm release serviceAccounts
   workload_identity_bindings = {
-    "tantu/api"       = { roles = ["roles/cloudsql.client", "roles/secretmanager.secretAccessor"] }
-    "tantu/worker"    = { roles = ["roles/cloudsql.client"] }
-    "tantu/qdrant"    = { roles = ["roles/storage.objectViewer"] }
+    "tantu/api"    = { roles = ["roles/cloudsql.client", "roles/secretmanager.secretAccessor"] }
+    "tantu/worker" = { roles = ["roles/cloudsql.client"] }
+    "tantu/qdrant" = { roles = ["roles/storage.objectViewer"] }
   }
 
   depends_on = [module.registry]
@@ -110,16 +110,16 @@ module "iam" {
 module "gke" {
   source = "./modules/gke"
 
-  project_id          = var.project_id
-  region              = var.region
-  env                 = var.env
-  cluster_name        = local.cluster_name
-  network             = module.vpc.vpc_self_link
-  subnetwork          = module.vpc.subnet_self_link
-  master_ipv4_cidr    = var.gke_master_ipv4_cidr
-  release_channel     = var.gke_release_channel
-  enable_spot         = var.enable_spot_nodes
-  gateway_class       = local.gateway_class
+  project_id       = var.project_id
+  region           = var.region
+  env              = var.env
+  cluster_name     = local.cluster_name
+  network          = module.vpc.vpc_self_link
+  subnetwork       = module.vpc.subnet_self_link
+  master_ipv4_cidr = var.gke_master_ipv4_cidr
+  release_channel  = var.gke_release_channel
+  enable_spot      = var.enable_spot_nodes
+  gateway_class    = local.gateway_class
 
   depends_on = [module.vpc, module.iam, google_project_service.required]
 }
@@ -135,9 +135,9 @@ module "secrets" {
   env        = var.env
   # Secrets created with random values as placeholders — rotate via gcloud or console
   secrets = {
-    "db-password"       = { replication = "automatic" }
-    "jwt-private-key"   = { replication = "automatic" }
-    "qdrant-api-key"    = { replication = "automatic" }
+    "db-password"     = { replication = "automatic" }
+    "jwt-private-key" = { replication = "automatic" }
+    "qdrant-api-key"  = { replication = "automatic" }
   }
   # Grant accessor to workload GSAs
   accessor_members = distinct(flatten([
@@ -170,17 +170,19 @@ module "cloudbuild" {
 # ──────────────────────────────────────────────
 # Qdrant on GKE (Helm release via kubernetes/helm providers)
 # Deployed AFTER GKE is ready — uses Helm provider with GKE auth
+# Two-phase: first apply with -var="enable_qdrant_helm=false", then true once cluster exists
 # ──────────────────────────────────────────────
 module "qdrant" {
+  count  = var.enable_qdrant_helm ? 1 : 0
   source = "./modules/qdrant"
 
-  project_id   = var.project_id
-  env          = var.env
-  cluster_name = module.gke.cluster_name
-  cluster_endpoint = module.gke.cluster_endpoint
+  project_id             = var.project_id
+  env                    = var.env
+  cluster_name           = module.gke.cluster_name
+  cluster_endpoint       = module.gke.cluster_endpoint
   cluster_ca_certificate = module.gke.cluster_ca_certificate
-  namespace    = "tantu"
-  enable_spot  = var.enable_spot_nodes
+  namespace              = "tantu"
+  enable_spot            = var.enable_spot_nodes
 
   depends_on = [module.gke, module.iam]
 }

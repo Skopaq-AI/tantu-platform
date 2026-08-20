@@ -15,11 +15,11 @@ resource "google_sql_database_instance" "postgres" {
   deletion_protection = var.deletion_protection
 
   settings {
-    tier              = var.tier
-    availability_type = var.ha_enabled ? "REGIONAL" : "ZONAL"
-    disk_type         = "PD_SSD"
-    disk_size         = var.disk_size_gb
-    disk_autoresize   = true
+    tier                  = var.tier
+    availability_type     = var.ha_enabled ? "REGIONAL" : "ZONAL"
+    disk_type             = "PD_SSD"
+    disk_size             = var.disk_size_gb
+    disk_autoresize       = true
     disk_autoresize_limit = 500
 
     backup_configuration {
