@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.7.2...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.8.0...v) (2026-08-21)
+
+
+### Bug Fixes
+
+* **edge:** make base the final default stage (cloud CI was building edge-orin L4T and failing) ([ab309e5](https://github.com/Skopaq-AI/tantu-platform/commit/ab309e5b329dada0b0a61239c1cddf3996408947))
+
+# [0.8.0](https://github.com/Skopaq-AI/tantu-platform/compare/v0.7.2...v0.8.0) (2026-08-21)
 
 
 ### Features
