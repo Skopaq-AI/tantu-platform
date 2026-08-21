@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.8...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.9...v) (2026-08-21)
+
+
+### Bug Fixes
+
+* **terraform:** unblock Infra apply — IAM + registry + GKE bootstrap ([a6b2572](https://github.com/Skopaq-AI/tantu-platform/commit/a6b25724d4f24a9bf99a29b009094e2d66309b0a))
+
+## [0.3.9](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.8...v0.3.9) (2026-08-21)
 
 
 ### Bug Fixes
