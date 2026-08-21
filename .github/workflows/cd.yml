@@ -155,7 +155,7 @@ jobs:
 
       - name: Docker meta — GHCR
         id: meta-ghcr
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY_GHCR }}/${{ github.repository_owner }}/tantu-${{ matrix.service }}
           flavor: latest=true
@@ -171,7 +171,7 @@ jobs:
       - name: Docker meta — GAR
         id: meta-gar
         if: env.GCP_PROJECT_ID != ''
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GCP_GAR_REPO }}/${{ matrix.service }}
           flavor: latest=true
