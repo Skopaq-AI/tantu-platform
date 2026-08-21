@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.7...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.8...v) (2026-08-21)
+
+
+### Bug Fixes
+
+* **terraform:** secrets IAM binding — for_each on static keys only ([e6a3d43](https://github.com/Skopaq-AI/tantu-platform/commit/e6a3d43c4dbe4fc3a7edf35d8dea2e7967ae86e2))
+
+## [0.3.8](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.7...v0.3.8) (2026-08-21)
 
 
 ### Bug Fixes
