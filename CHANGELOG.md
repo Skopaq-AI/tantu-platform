@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.13...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.14...v) (2026-08-21)
+
+
+### Features
+
+* **auth:** org-level RBAC (8 roles), ABAC plant/line, JWT RS256/HS256, HttpOnly refresh, RLS, middleware+RoleGuard, landing public/core behind auth, user mgmt + API keys ([e1c7905](https://github.com/Skopaq-AI/tantu-platform/commit/e1c790527188c0198d3f97e2c4bf36a6dd915c08))
+
+## [0.3.14](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.13...v0.3.14) (2026-08-21)
 
 
 ### Bug Fixes
