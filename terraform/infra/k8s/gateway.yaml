@@ -10,7 +10,7 @@ metadata:
   namespace: tantu
   annotations:
     # Bind to the static global IP created by Terraform (modules/gke)
-    networking.gke.io/static-ips: tantu-ENV-gke-gateway-ip
+    networking.gke.io/static-ips: tantu-dev-gke-gateway-ip
 spec:
   gatewayClassName: gke-l7-global-external-managed
   listeners:
@@ -22,7 +22,7 @@ spec:
       # HTTP only for dev — add HTTPS+ManagedCertificate in prod
   addresses:
     - type: NamedAddress
-      value: tantu-ENV-gke-gateway-ip
+      value: tantu-dev-gke-gateway-ip
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

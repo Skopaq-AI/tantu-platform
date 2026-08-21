@@ -1,6 +1,6 @@
 # Gateway + HTTPRoute are intentionally NOT templated via Helm in prod — they are cluster-scoped infra managed via kubectl/ArgoCD
 # This file is a copy for helm rendering; prefer terraform/infra/k8s/gateway.yaml as source of truth.
-{{- if .Values.gateway.enabled | default false }}
+{{- if and .Values.gateway .Values.gateway.enabled }}
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata: { name: tantu-gateway, namespace: {{ .Release.Namespace }} }
