@@ -1,12 +1,21 @@
-"""Adapter registry — factory + lifecycle manager."""
+"""Adapter registry — factory + lifecycle manager.
+
+Persistence: adapters are stored in Postgres (adapter_configs) for durability
+across pod reschedules. Writes are best-effort: if DB is unreachable the
+in-memory register still succeeds and a warning is logged. On startup, caller
+should invoke load_persisted() (or the lifespan hook does) to rehydrate.
+"""
 
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Dict, List, Optional
 
 from ..domain.models import AdapterConfig, Protocol
 from ..adapters.base import BaseAdapter
+
+log = logging.getLogger("adapter_fabric.registry")
 
 
 def _create_adapter(config: AdapterConfig) -> BaseAdapter:
@@ -45,7 +54,7 @@ class AdapterRegistry:
         self._adapters: Dict[str, BaseAdapter] = {}
         self._lock = asyncio.Lock()
 
-    async def register(self, config: AdapterConfig) -> BaseAdapter:
+    async def register(self, config: AdapterConfig, *, persist: bool = True) -> BaseAdapter:
         async with self._lock:
             if config.adapter_id in self._adapters:
                 # replace: stop old
@@ -58,9 +67,19 @@ class AdapterRegistry:
             self._adapters[config.adapter_id] = adapter
             if config.enabled:
                 await adapter.start()
+            # best-effort persistence (skip during restore to avoid loop)
+            if persist:
+                try:
+                    from ..infra.persistence import save_adapter_config
+
+                    ok = await save_adapter_config(config)
+                    if not ok:
+                        log.debug("register persist deferred for %s (DB unreachable)", config.adapter_id)
+                except Exception as e:
+                    log.debug("register persist skipped for %s: %s", config.adapter_id, e)
             return adapter
 
-    async def remove(self, adapter_id: str) -> bool:
+    async def remove(self, adapter_id: str, *, persist: bool = True) -> bool:
         async with self._lock:
             ad = self._adapters.pop(adapter_id, None)
             if ad is None:
@@ -69,6 +88,15 @@ class AdapterRegistry:
                 await ad.stop()
             except Exception:
                 pass
+            if persist:
+                try:
+                    from ..infra.persistence import delete_adapter_config
+
+                    ok = await delete_adapter_config(adapter_id)
+                    if not ok:
+                        log.debug("remove persist deferred for %s (DB unreachable)", adapter_id)
+                except Exception as e:
+                    log.debug("remove persist skipped for %s: %s", adapter_id, e)
             return True
 
     async def get(self, adapter_id: str) -> Optional[BaseAdapter]:
@@ -121,3 +149,33 @@ class AdapterRegistry:
                 await ad.start()
             except Exception:
                 pass
+
+    async def restore_from_db(self) -> int:
+        """Load persisted AdapterConfigs from Postgres and populate registry.
+
+        Called on startup/lifespan. Best-effort: returns count restored,
+        0 if DB unreachable. Each config is registered with persist=False to
+        avoid write-back loop. Errors per-adapter are logged but do not abort.
+        """
+        try:
+            from ..infra.persistence import load_adapter_configs
+        except Exception as e:
+            log.debug("restore_from_db persistence import failed: %s", e)
+            return 0
+        try:
+            configs = await load_adapter_configs()
+        except Exception as e:
+            log.debug("restore_from_db load failed: %s", e)
+            return 0
+        restored = 0
+        for cfg in configs:
+            try:
+                # avoid double persist
+                await self.register(cfg, persist=False)
+                restored += 1
+            except Exception as e:
+                log.warning("restore_from_db skip %s: %s", getattr(cfg, "adapter_id", "?"), e)
+                continue
+        if restored:
+            log.info("restore_from_db restored %d adapter(s)", restored)
+        return restored

@@ -44,12 +44,26 @@ set_publisher(_publisher_global)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # type: ignore
-    # startup
+    # startup — Postgres (best-effort) + NATS
+    try:
+        from ..infra.db import init_db
+
+        await init_db()
+        logger.info("adapter-fabric db init attempted")
+    except Exception as e:
+        logger.warning("db.init failed", error=str(e))
+    # restore persisted adapters before pipeline starts so they are attached
+    try:
+        restored = await _registry_global.restore_from_db()
+        if restored:
+            logger.info("adapters restored from db", count=restored)
+    except Exception as e:
+        logger.warning("adapter restore failed", error=str(e))
     try:
         await _publisher_global.connect()
     except Exception as e:
         logger.warning("nats.connect failed", error=str(e))
-    # pipeline will attach to adapters as they are registered; start empty
+    # pipeline will attach to adapters as they are registered; start empty or with restored
     global _pipeline
     _pipeline = Pipeline(_registry_global, _publisher_global)
     await _pipeline.start()
@@ -60,6 +74,12 @@ async def lifespan(app: FastAPI):  # type: ignore
         await _pipeline.stop()
     await _registry_global.stop_all()
     await _publisher_global.close()
+    try:
+        from ..infra.db import close_db
+
+        await close_db()
+    except Exception:
+        pass
 
 
 app = FastAPI(
@@ -428,6 +448,62 @@ async def tag_map_preview(body: CompoundPreviewIn):
     except Exception as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     return {"formula": body.formula, "variables": body.variables, "value": value}
+
+
+# ---------------------------------------------------------------------------
+# discovery — real OPC-UA mDNS + Modbus 502 SYN scan
+# ---------------------------------------------------------------------------
+@app.get("/discover", tags=["discovery"], summary="Real discovery — mDNS _opcua-tcp + TCP 502/4840 scan")
+async def discover(
+    subnet: str = Query(default="192.168.1.0/24", description="Subnet CIDR or comma list, e.g. 10.10.0.0/24"),
+    mdns_timeout: float = Query(default=2.5, ge=0.5, le=10),
+    tcp_timeout: float = Query(default=0.55, ge=0.1, le=3),
+    overall_timeout: float = Query(default=5.0, ge=1, le=20),
+    claims: dict = Depends(optional_auth),
+):
+    from ..application.discovery import discover_all
+
+    try:
+        discovered = await discover_all(
+            subnet=subnet, mdns_timeout=mdns_timeout, tcp_timeout=tcp_timeout, overall_timeout=overall_timeout
+        )
+    except Exception as e:
+        logger.warning("discover failed", error=str(e))
+        discovered = []
+    live = []
+    try:
+        live = await _registry_global.health_all()
+    except Exception:
+        live = []
+    return {"subnet": subnet, "discovered": discovered, "live_adapters": live, "count": len(discovered)}
+
+
+@app.get("/onboard/discover", tags=["onboard"], summary="Alias for gateway — real discovery")
+async def onboard_discover(
+    plant_id: str = Query(default="default"),
+    subnet: str = Query(default="192.168.1.0/24"),
+    claims: dict = Depends(optional_auth),
+):
+    # plant_id kept for gateway compatibility (not used here, but echoed)
+    from ..application.discovery import discover_all
+
+    try:
+        discovered = await discover_all(subnet=subnet)
+    except Exception as e:
+        logger.warning("onboard discover failed", error=str(e))
+        discovered = []
+    live = []
+    try:
+        live = await _registry_global.health_all()
+    except Exception:
+        live = []
+    return {
+        "plant_id": plant_id,
+        "subnet": subnet,
+        "discovered": discovered,
+        "live_adapters": live,
+        "next": "POST /adapters with params = discovered endpoint or POST /onboard via gateway",
+    }
 
 
 # ---------------------------------------------------------------------------

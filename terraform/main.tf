@@ -138,6 +138,8 @@ module "secrets" {
     "db-password"     = { replication = "automatic" }
     "jwt-private-key" = { replication = "automatic" }
     "qdrant-api-key"  = { replication = "automatic" }
+    "gemini-api-key"  = { replication = "automatic" }
+    "hf-token"        = { replication = "automatic" }
   }
   # Grant accessor to workload GSAs
   accessor_members = distinct(flatten([

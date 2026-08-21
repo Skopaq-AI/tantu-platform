@@ -92,6 +92,11 @@ spec:
             - containerPort: 8001
               name: http
           env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: tantu-secrets
+                  key: DATABASE_URL
             - name: NATS_URL
               value: nats://nats:4222
             - name: REDIS_URL
@@ -166,7 +171,7 @@ spec:
             - name: NATS_URL
               value: nats://nats:4222
             - name: REDIS_URL
-              value: redis://10.30.49.75:6378/0
+              value: "redis://redis:6379/0"
             - name: TIER
               value: orin-nano
           resources:
@@ -235,7 +240,19 @@ spec:
             - name: NATS_URL
               value: nats://nats:4222
             - name: VLLM_URL
-              value: http://vllm:8000
+              value: http://vllm:8000/v1/chat/completions
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tantu-secrets
+                  key: gemini-api-key
+                  optional: true
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: tantu-secrets
+                  key: hf-token
+                  optional: true
           resources:
             requests:
               cpu: 100m

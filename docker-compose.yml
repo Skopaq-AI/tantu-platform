@@ -26,10 +26,17 @@ services:
     build: ./services/adapter-fabric
     ports: ["8001:8001"]
     environment:
+      DATABASE_URL: postgresql+psycopg://tantu:${POSTGRES_PASSWORD:-tantu_dev_only_change_me}@postgres:5432/tantu
       NATS_URL: nats://nats:4222
       REDIS_URL: redis://redis:6379/0
       JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
-    depends_on: [nats, redis]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_started
+      redis:
+        condition: service_started
     healthcheck: { test: ["CMD", "curl", "-f", "http://localhost:8001/health"], interval: 10s, retries: 5 }
 
   edge-perception:

@@ -23,6 +23,8 @@ dependencies = [
     "opentelemetry-exporter-otlp>=1.24",
     "opentelemetry-instrumentation-fastapi>=0.45b0",
     "prometheus-client>=0.20",
+    "asyncua>=1.1,<2",
+    "zeroconf>=0.130,<1",
 ]
 
 [project.optional-dependencies]

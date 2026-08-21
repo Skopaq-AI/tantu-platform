@@ -331,31 +331,61 @@ async def onboard(body: OnboardRequest, claims: dict = Depends(require_auth)):
 
 @app.get("/onboard/discover", tags=["onboard"], summary="Discover devices on plant network (mDNS/Modbus scan)")
 async def discover(plant_id: str, subnet: str = "192.168.1.0/24", claims: dict = Depends(require_auth)):
-    # Real discovery would run nmap/asyncua find_servers + modbus scan; here we return scan template + live adapters
+    # Real discovery via adapter-fabric (mDNS _opcua-tcp._tcp.local + asyncua find_servers + 502 SYN scan)
     import httpx
 
     base = settings.adapter_fabric_url.rstrip("/")
-    live = []
+    live: list = []
+    discovered: list = []
+    # Try real discovery via adapter-fabric
     try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
-            token = issue_jwt(claims.get("sub","discover"), plant_id, claims.get("role","ORG_ADMIN"), exp_min=5)
-            r = await client.get(f"{base}/adapters", headers={"Authorization": f"Bearer {token}"})
-            if r.status_code == 200:
-                live = r.json()
+        async with httpx.AsyncClient(timeout=6.0) as client:
+            token = issue_jwt(claims.get("sub", "discover"), plant_id, claims.get("role", "ORG_ADMIN"), exp_min=5)
+            # Prefer adapter-fabric real discover
+            for path in (f"{base}/onboard/discover?plant_id={plant_id}&subnet={subnet}", f"{base}/discover?subnet={subnet}"):
+                try:
+                    r = await client.get(path, headers={"Authorization": f"Bearer {token}"})
+                    if r.status_code == 200:
+                        j = r.json()
+                        discovered = j.get("discovered") or j.get("discovered", [])
+                        live = j.get("live_adapters") or j.get("live_adapters") or []
+                        # also fetch live_adapters if not in response
+                        if not live:
+                            try:
+                                r2 = await client.get(f"{base}/adapters", headers={"Authorization": f"Bearer {token}"})
+                                if r2.status_code == 200:
+                                    live = r2.json()
+                            except Exception:
+                                pass
+                        if discovered:
+                            break
+                except Exception:
+                    continue
+            # fallback live fetch if still empty
+            if not live:
+                try:
+                    r = await client.get(f"{base}/adapters", headers={"Authorization": f"Bearer {token}"})
+                    if r.status_code == 200:
+                        live = r.json()
+                except Exception:
+                    live = []
     except Exception:
         live = []
-    # Return discovery template for plug-and-play
+        discovered = []
+    # Fallback template if real scan found nothing (no devices on this subnet or not reachable)
+    if not discovered:
+        discovered = [
+            {"protocol": "opcua", "hint": "opc.tcp://192.168.1.10:4840", "mDNS": "_opcua-tcp._tcp.local", "status": "scan with asyncua find_servers", "discovery_method": "template"},
+            {"protocol": "modbus", "hint": "192.168.1.11:502 unit 1", "scan": "pymodbus 502 TCP SYN", "discovery_method": "template"},
+            {"protocol": "mqtt", "hint": "mqtt://192.168.1.12:1883 topic tantu/#", "scan": "paho-mqtt SUB", "discovery_method": "template"},
+            {"protocol": "mtconnect", "hint": "http://192.168.1.13:5000/current", "scan": "httpx GET /current", "discovery_method": "template"},
+            {"protocol": "ethernet_ip", "hint": "192.168.1.14 EtherNet/IP Fanuc/ABB", "scan": "cpppo", "discovery_method": "template"},
+            {"protocol": "camera", "hint": "rtsp://192.168.1.20/stream", "scan": "V4L2 hailort", "discovery_method": "template"},
+        ]
     return {
         "plant_id": plant_id,
         "subnet": subnet,
-        "discovered": [
-            {"protocol": "opcua", "hint": "opc.tcp://192.168.1.10:4840", "mDNS": "_opcua-tcp._tcp.local", "status": "scan with asyncua find_servers"},
-            {"protocol": "modbus", "hint": "192.168.1.11:502 unit 1", "scan": "pymodbus 502 TCP SYN"},
-            {"protocol": "mqtt", "hint": "mqtt://192.168.1.12:1883 topic tantu/#", "scan": "paho-mqtt SUB"},
-            {"protocol": "mtconnect", "hint": "http://192.168.1.13:5000/current", "scan": "httpx GET /current"},
-            {"protocol": "ethernet_ip", "hint": "192.168.1.14 EtherNet/IP Fanuc/ABB", "scan": "cpppo"},
-            {"protocol": "camera", "hint": "rtsp://192.168.1.20/stream", "scan": "V4L2 hailort"},
-        ],
+        "discovered": discovered,
         "live_adapters": live,
         "next": "POST /onboard with devices[].params = discovered hint",
     }

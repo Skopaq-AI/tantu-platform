@@ -1,0 +1,130 @@
+# TANTU vLLM — Nemotron-9B on L4 (GKE Autopilot)
+# Apply ONLY when L4 quota available; otherwise pods stay Pending but cluster is unaffected
+# DualRouter fallback keeps reasoning-copilot serving grounded mocks.
+#   gcloud compute accelerator-types list --filter="name:nvidia-l4" --project=tantu-beta-20260821-01
+#   gcloud compute project-info describe --project=tantu-beta-20260821-01 --format="value(quotas[].limit)" | grep -i l4 || echo "no L4 quota"
+#   kubectl apply -f vllm.l4.yaml
+# Troubleshoot: kubectl describe pod -n tantu -l app=vllm ; kubectl logs -n tantu -l app=vllm -c vllm
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm
+  namespace: tantu
+  labels: { app: vllm }
+spec:
+  selector: { app: vllm }
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm
+  namespace: tantu
+  labels: { app: vllm }
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # GPU cannot share
+  selector:
+    matchLabels: { app: vllm }
+  template:
+    metadata:
+      labels: { app: vllm }
+      annotations:
+        # Autopilot triggers GPU provisioning via resource request; optional driver pin
+        cloud.google.com/gke-gpu-driver-version: "latest"
+    spec:
+      terminationGracePeriodSeconds: 60
+      # ── GKE Autopilot L4 accelerator class ──
+      # For Standard GKE, replace with: nodeSelector: { accelerator: nvidia-tesla-l4 } or node pool label
+      nodeSelector:
+        cloud.google.com/gke-accelerator: nvidia-l4
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:v0.6.3  # pin; :latest also works
+          imagePullPolicy: IfNotPresent
+          command:
+            - python3
+            - -m
+            - vllm.entrypoints.openai.api_server
+          args:
+            - --model=nvidia/NVIDIA-Nemotron-Nano-9B-v2
+            # Use --served-model-name so clients can request "nemotron-9b" regardless of HF repo
+            - --served-model-name=nemotron-9b
+            - --host=0.0.0.0
+            - --port=8000
+            - --max-model-len=4096
+            - --gpu-memory-utilization=0.90
+            - --enforce-eager
+            - --dtype=auto
+            - --trust-remote-code
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: tantu-secrets
+                  key: hf-token
+                  optional: true
+            - name: VLLM_LOGGING_LEVEL
+              value: INFO
+          resources:
+            requests:
+              cpu: "4"
+              memory: 20Gi
+              ephemeral-storage: 30Gi
+              nvidia.com/gpu: 1
+            limits:
+              cpu: "4"
+              memory: 24Gi
+              ephemeral-storage: 30Gi
+              nvidia.com/gpu: 1
+          livenessProbe:
+            httpGet: { path: /health, port: 8000 }
+            initialDelaySeconds: 120  # model load
+            periodSeconds: 15
+            failureThreshold: 6
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet: { path: /health, port: 8000 }
+            initialDelaySeconds: 90
+            periodSeconds: 10
+            failureThreshold: 12
+          startupProbe:
+            httpGet: { path: /health, port: 8000 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 30
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            # - name: model-cache  # optional PVC for HF cache
+            #   mountPath: /root/.cache/huggingface
+          securityContext:
+            runAsNonRoot: false  # vLLM needs root for shm/nccl; lock down via readOnlyRootFilesystem:false
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 8Gi
+        # - name: model-cache
+        #   persistentVolumeClaim:
+        #     claimName: vllm-model-cache
+              # Create PVC separately: kubectl apply -f - <<EOF
+              # apiVersion: v1; kind: PersistentVolumeClaim
+              # metadata: {name: vllm-model-cache, namespace: tantu}
+              # spec: {accessModes: [ReadWriteOnce], resources: {requests: {storage: 40Gi}}}
+              # EOF
