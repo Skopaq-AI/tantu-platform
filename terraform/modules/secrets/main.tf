@@ -26,16 +26,14 @@ resource "google_secret_manager_secret_version" "placeholder" {
   }
 }
 
-resource "google_secret_manager_secret_iam_member" "accessor" {
-  for_each = {
-    for pair in setproduct(keys(var.secrets), var.accessor_members) : "${pair[0]}__${pair[1]}" => {
-      secret = pair[0]
-      member = pair[1]
-    }
-  }
+resource "google_secret_manager_secret_iam_binding" "accessor" {
+  # for_each keys are static (var.secrets keys only) — members list can be unknown
+  # (var.accessor_members comes from IAM GSA emails, unknown at plan)
+  # Using binding instead of member avoids "Invalid for_each argument: var.accessor_members is known only after apply"
+  for_each = var.secrets
 
   project   = var.project_id
-  secret_id = google_secret_manager_secret.secrets[each.value.secret].secret_id
+  secret_id = google_secret_manager_secret.secrets[each.key].secret_id
   role      = "roles/secretmanager.secretAccessor"
-  member    = each.value.member
+  members   = var.accessor_members
 }
