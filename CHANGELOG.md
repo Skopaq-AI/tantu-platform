@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.1.0...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.2.0...v) (2026-08-21)
+
+
+### Features
+
+* **gcp:** deployer SA + WIF pool/provider — Terraform module + 1-click script ([bcf86d0](https://github.com/Skopaq-AI/tantu-platform/commit/bcf86d04eb32d7766f6b9046dab368e83b511088))
+
+# [0.2.0](https://github.com/Skopaq-AI/tantu-platform/compare/v0.1.0...v0.2.0) (2026-08-21)
 
 
 ### Features
