@@ -45,7 +45,11 @@ next-env.d.ts
 *.pem
 *.key
 *.crt
-secrets/
+# secrets/ - allow terraform/modules/secrets (TF module) — ignore only top-level local secrets
+/.secrets/
+secrets/*.key
+secrets/*.json
+secrets/*.pem
 .vault-token
 
 # ── Docker / Data volumes ───────────────────────────────────────────
