@@ -10,6 +10,18 @@ spec:
     - port: 6379
       targetPort: 6379
 ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-data
+  namespace: tantu
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard-rwo
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -33,7 +45,7 @@ spec:
           image: redis:7-alpine
           ports:
             - containerPort: 6379
-          args: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+          args: ["redis-server", "--appendonly", "yes", "--save", "60", "1", "--dir", "/data"]
           resources:
             requests:
               cpu: 100m
@@ -41,6 +53,9 @@ spec:
             limits:
               cpu: 500m
               memory: 256Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
           readinessProbe:
             exec:
               command: ["redis-cli", "ping"]
@@ -51,3 +66,7 @@ spec:
               command: ["redis-cli", "ping"]
             initialDelaySeconds: 10
             periodSeconds: 20
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: redis-data
