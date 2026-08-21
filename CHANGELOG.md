@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.8.1...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.8.2...v) (2026-08-21)
+
+
+### Features
+
+* **frontend:** child-simple landing — layman language, AI still prominent ([d90aa33](https://github.com/Skopaq-AI/tantu-platform/commit/d90aa33b4e27af8263049d0628f655863c45780e))
+
+## [0.8.2](https://github.com/Skopaq-AI/tantu-platform/compare/v0.8.1...v0.8.2) (2026-08-21)
 
 
 ### Bug Fixes
