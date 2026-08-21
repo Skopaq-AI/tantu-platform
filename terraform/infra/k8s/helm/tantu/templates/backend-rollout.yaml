@@ -9,21 +9,14 @@ spec:
   replicas: {{ .Values.backend.replicaCount }}
   strategy:
     canary:
-      trafficRouting:
-        plugins:
-          argoproj-labs/gatewayAPI:
-            httpRoute: tantu-routes
-            namespace: {{ .Release.Namespace }}
+      maxSurge: 1
+      maxUnavailable: 0
       steps:
-        - setWeight: 10
-        - pause: { duration: 2m }
-        - analysis: { templates: [{ templateName: error-rate }], args: [{ name: service-name, value: tantu-backend }] }
         - setWeight: 30
-        - pause: { duration: 5m }
+        - pause: { duration: 10s }
         - setWeight: 60
-        - pause: { duration: 5m }
-        - setWeight: 80
-        - pause: { duration: 2m }
+        - pause: { duration: 10s }
+        - setWeight: 100
   selector: { matchLabels: { app: tantu-backend } }
   template:
     metadata: { labels: { app: tantu-backend } }
@@ -34,12 +27,17 @@ spec:
           image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
           imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
           ports: [{ containerPort: 8000, name: http }]
+          {{- if .Values.backend.env }}
+          env: {{- toYaml .Values.backend.env | nindent 12 }}
+          {{- end }}
           envFrom: [{ secretRef: { name: tantu-secrets } }]
           livenessProbe: {{- toYaml .Values.backend.probes.liveness | nindent 12 }}
           readinessProbe: {{- toYaml .Values.backend.probes.readiness | nindent 12 }}
           resources: {{- toYaml .Values.backend.resources | nindent 12 }}
           securityContext: {{- toYaml .Values.backend.securityContext | nindent 12 }}
+      {{- if .Values.backend.nodeSelector }}
       nodeSelector: {{- toYaml .Values.backend.nodeSelector | nindent 8 }}
+      {{- end }}
       {{- with .Values.backend.tolerations }}
       tolerations: {{- toYaml . | nindent 8 }}
       {{- end }}

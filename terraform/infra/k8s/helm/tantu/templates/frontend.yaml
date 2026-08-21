@@ -4,6 +4,9 @@ kind: Deployment
 metadata: { name: tantu-frontend, namespace: {{ .Release.Namespace }} }
 spec:
   replicas: {{ .Values.frontend.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 0, maxUnavailable: 1 }
   selector: { matchLabels: { app: tantu-frontend } }
   template:
     metadata: { labels: { app: tantu-frontend } }
@@ -11,10 +14,12 @@ spec:
       containers:
         - name: web
           image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
-          ports: [{ containerPort: 3000 }]
+          ports: [{ containerPort: 3000 }, { containerPort: 8080 }]
           resources: {{- toYaml .Values.frontend.resources | nindent 12 }}
-          securityContext: { runAsNonRoot: true, readOnlyRootFilesystem: true, allowPrivilegeEscalation: false }
+          securityContext: { runAsNonRoot: false, readOnlyRootFilesystem: false, allowPrivilegeEscalation: false }
+      {{- if .Values.frontend.nodeSelector }}
       nodeSelector: {{- toYaml .Values.frontend.nodeSelector | nindent 8 }}
+      {{- end }}
 ---
 apiVersion: v1
 kind: Service

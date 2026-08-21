@@ -30,14 +30,9 @@ backend:
       cpu: 1000m
       memory: 1Gi
 
-  # Spot for non-prod (Autopilot compute class), on-demand for prod
-  nodeSelector:
-    cloud.google.com/compute-class: Scale-Out # Spot — overridden to Balanced/on-demand in prod
-  tolerations:
-    - key: cloud.google.com/compute-class
-      operator: Equal
-      value: Scale-Out
-      effect: NoSchedule
+  # Autopilot compute class — use Balanced/on-demand in prod, empty (any) in dev to avoid Scale-Out 1Gi/1229Mi mutation + single NAP capacity
+  nodeSelector: {}
+  tolerations: []
 
   env:
     - name: ENV
@@ -94,10 +89,9 @@ frontend:
   serviceAccount:
     create: false
   resources:
-    requests: { cpu: 300m, memory: 512Mi }
-    limits: { cpu: 600m, memory: 1Gi }
-  nodeSelector:
-    cloud.google.com/compute-class: Scale-Out
+    requests: { cpu: 150m, memory: 512Mi }
+    limits: { cpu: 300m, memory: 768Mi }
+  nodeSelector: {}
   service:
     type: ClusterIP
     port: 80

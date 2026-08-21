@@ -7,8 +7,8 @@ backend:
   resources:
     requests: { cpu: 250m, memory: 256Mi }
     limits: { cpu: 500m, memory: 512Mi }
-  nodeSelector:
-    cloud.google.com/compute-class: Scale-Out # Spot
+  nodeSelector: {} # dev: allow any node (was Scale-Out Spot causing 1Gi Autopilot mutation + single NAP capacity)
+  tolerations: []
   autoscaling:
     enabled: true
     minReplicas: 1
@@ -18,11 +18,25 @@ backend:
       value: dev
     - name: LOG_LEVEL
       value: debug
+    - name: ADAPTER_FABRIC_URL
+      value: http://adapter-fabric:8001
+    - name: EDGE_PERCEPTION_URL
+      value: http://edge-perception:8002
+    - name: REASONING_COPILOT_URL
+      value: http://reasoning-copilot:8003
+    - name: ORCHESTRATOR_URL
+      value: http://orchestrator:8004
+    - name: REASONING_URL
+      value: http://reasoning-copilot:8003
+    - name: EDGE_URL
+      value: http://edge-perception:8002
 
 frontend:
   replicaCount: 1
-  nodeSelector:
-    cloud.google.com/compute-class: Scale-Out
+  resources:
+    requests: { cpu: 150m, memory: 512Mi }
+    limits: { cpu: 300m, memory: 768Mi }
+  nodeSelector: {} # dev: allow any node (was Scale-Out causing 1229Mi mutation + scheduling failure)
   autoscaling: { enabled: false }
 
 qdrant:
