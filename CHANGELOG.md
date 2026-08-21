@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.6.0...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.7.0...v) (2026-08-21)
+
+
+### Bug Fixes
+
+* **modbus:** pymodbus 3.x compat slave→device_id fallback (no stubs) ([907277f](https://github.com/Skopaq-AI/tantu-platform/commit/907277fc50433ec85fe3a4cb03894099fd4abb75))
+
+# [0.7.0](https://github.com/Skopaq-AI/tantu-platform/compare/v0.6.0...v0.7.0) (2026-08-21)
 
 
 ### Features
