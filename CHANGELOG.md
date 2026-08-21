@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.10...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.11...v) (2026-08-21)
+
+
+### Bug Fixes
+
+* **helm:** qdrant 0.8.6 → 1.15.5 + gateway TLS fix for dev ([b9f4521](https://github.com/Skopaq-AI/tantu-platform/commit/b9f45210c44792ae564b10ab605465923a9c6cc8))
+
+## [0.3.11](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.10...v0.3.11) (2026-08-21)
 
 
 ### Bug Fixes
