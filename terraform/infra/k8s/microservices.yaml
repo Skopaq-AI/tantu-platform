@@ -165,6 +165,8 @@ spec:
               value: http://adapter-fabric:8001
             - name: NATS_URL
               value: nats://nats:4222
+            - name: REDIS_URL
+              value: redis://10.30.49.75:6378/0
             - name: TIER
               value: orin-nano
           resources:

@@ -38,6 +38,8 @@ spec:
         - path: { type: PathPrefix, value: /api }
         - path: { type: PathPrefix, value: /health }
         - path: { type: PathPrefix, value: /docs }
+        - path: { type: PathPrefix, value: /onboard }
+        - path: { type: PathPrefix, value: /auth }
       backendRefs:
         - name: tantu-backend
           port: 80

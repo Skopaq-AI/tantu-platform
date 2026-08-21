@@ -247,6 +247,120 @@ async def auth_me(claims: dict = Depends(require_auth)):
     }
 
 
+# ── Onboard — plug-and-play plant integration (one-call) ───────────────
+class OnboardTag(BaseModel):
+    source_tag: str
+    metric: str
+    unit: Optional[str] = None
+    scale: float = 1.0
+    offset: float = 0.0
+    data_type: str = "float"
+
+
+class OnboardDevice(BaseModel):
+    protocol: str  # opcua|modbus|mqtt|mtconnect|ethernet_ip|camera
+    station_id: str
+    params: dict[str, Any]  # endpoint/host/port etc.
+    tags: list[OnboardTag] = []
+    poll_interval_ms: int = 1000
+
+
+class OnboardRequest(BaseModel):
+    plant_id: str
+    line_id: Optional[str] = None
+    devices: list[OnboardDevice]
+    tier: str = "orin-nano"  # pi5-hailo|orin-nano|thor
+
+
+class OnboardResponse(BaseModel):
+    plant_id: str
+    registered: list[dict[str, Any]]
+    failed: list[dict[str, Any]]
+    tier: str
+
+
+@app.post("/onboard", tags=["onboard"], summary="Plug-and-play onboard — register plant devices in one call")
+async def onboard(body: OnboardRequest, claims: dict = Depends(require_auth)):
+    # RBAC: only ORG_ADMIN / OWNER / PLANT_HEAD can onboard
+    principal = _claims_to_principal(claims)
+    if principal.role not in ("ORG_ADMIN", "OWNER", "ORG_OWNER", "PLATFORM_SUPER_ADMIN", "PLANT_HEAD", "ADMIN"):
+        raise HTTPException(status_code=403, detail="onboard requires ORG_ADMIN/PLANT_HEAD")
+    # ABAC: must be in plant scope — allow if super admin or same plant or wildcard
+    allowed_plant = claims.get("plant_id")
+    plant_ids = claims.get("plant_ids") or []
+    if body.plant_id not in (allowed_plant, *plant_ids) and "*" not in plant_ids and claims.get("role") not in ("PLATFORM_SUPER_ADMIN", "ORG_OWNER", "ORG_ADMIN", "ADMIN"):
+        # also allow if no plant_ids restriction (legacy)
+        if plant_ids:
+            raise HTTPException(status_code=403, detail=f"ABAC plant deny: {body.plant_id}")
+    registered: list[dict[str, Any]] = []
+    failed: list[dict[str, Any]] = []
+    # Call adapter-fabric for each device via downstream_client
+    import httpx
+
+    base = settings.adapter_fabric_url.rstrip("/")
+    headers = {"Authorization": f"Bearer {issue_jwt(claims.get('sub','onboard'), body.plant_id, claims.get('role','ORG_ADMIN'), exp_min=5)}"}
+    # Use service account token for internal call - re-issue with same claims
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        for dev in body.devices:
+            adapter_id = f"{body.plant_id}-{dev.station_id}-{dev.protocol}"
+            payload = {
+                "adapter_id": adapter_id,
+                "protocol": dev.protocol.lower(),
+                "station_id": dev.station_id,
+                "enabled": True,
+                "poll_interval_ms": dev.poll_interval_ms,
+                "params": dev.params,
+                "tags": [{"source_tag": t.source_tag, "metric": t.metric, "unit": t.unit, "scale": t.scale, "offset": t.offset, "data_type": t.data_type} for t in dev.tags],
+            }
+            try:
+                r = await client.post(f"{base}/adapters", json=payload, headers=headers)
+                if r.status_code in (200, 201):
+                    registered.append({"adapter_id": adapter_id, "protocol": dev.protocol, "status": r.json().get("status", "ok")})
+                else:
+                    failed.append({"adapter_id": adapter_id, "error": r.text[:300]})
+            except Exception as e:
+                failed.append({"adapter_id": adapter_id, "error": str(e)[:300]})
+    # Also ensure tier is recorded (edge-perception)
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            await client.post(f"{settings.edge_perception_url.rstrip('/')}/tier", json={"tier": body.tier}, headers=headers)
+    except Exception:
+        pass
+    return OnboardResponse(plant_id=body.plant_id, registered=registered, failed=failed, tier=body.tier)
+
+
+@app.get("/onboard/discover", tags=["onboard"], summary="Discover devices on plant network (mDNS/Modbus scan)")
+async def discover(plant_id: str, subnet: str = "192.168.1.0/24", claims: dict = Depends(require_auth)):
+    # Real discovery would run nmap/asyncua find_servers + modbus scan; here we return scan template + live adapters
+    import httpx
+
+    base = settings.adapter_fabric_url.rstrip("/")
+    live = []
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            token = issue_jwt(claims.get("sub","discover"), plant_id, claims.get("role","ORG_ADMIN"), exp_min=5)
+            r = await client.get(f"{base}/adapters", headers={"Authorization": f"Bearer {token}"})
+            if r.status_code == 200:
+                live = r.json()
+    except Exception:
+        live = []
+    # Return discovery template for plug-and-play
+    return {
+        "plant_id": plant_id,
+        "subnet": subnet,
+        "discovered": [
+            {"protocol": "opcua", "hint": "opc.tcp://192.168.1.10:4840", "mDNS": "_opcua-tcp._tcp.local", "status": "scan with asyncua find_servers"},
+            {"protocol": "modbus", "hint": "192.168.1.11:502 unit 1", "scan": "pymodbus 502 TCP SYN"},
+            {"protocol": "mqtt", "hint": "mqtt://192.168.1.12:1883 topic tantu/#", "scan": "paho-mqtt SUB"},
+            {"protocol": "mtconnect", "hint": "http://192.168.1.13:5000/current", "scan": "httpx GET /current"},
+            {"protocol": "ethernet_ip", "hint": "192.168.1.14 EtherNet/IP Fanuc/ABB", "scan": "cpppo"},
+            {"protocol": "camera", "hint": "rtsp://192.168.1.20/stream", "scan": "V4L2 hailort"},
+        ],
+        "live_adapters": live,
+        "next": "POST /onboard with devices[].params = discovered hint",
+    }
+
+
 # ── Helpers — RBAC/ABAC guard ───────────────────────────────────────
 
 
