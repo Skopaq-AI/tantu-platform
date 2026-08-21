@@ -1,6 +1,6 @@
 [project]
 name = "reasoning-copilot"
-version = "0.3.6"
+version = "0.3.7"
 description = "TANTU Reasoning Copilot — dual-sourced GENAI (Gemini ER2 + Nemotron-9B), RAG (Qdrant), vernacular hi/ta/te/kn — FastAPI 8003"
 readme = "README.md"
 requires-python = ">=3.11"

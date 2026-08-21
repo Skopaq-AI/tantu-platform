@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.5...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.6...v) (2026-08-21)
+
+
+### Bug Fixes
+
+* **terraform:** add IAM aliases workload_gsa_emails + workload_identity_sa_emails ([87e4168](https://github.com/Skopaq-AI/tantu-platform/commit/87e41683d62186c7469291b06b8e028e5e2db8a0))
+
+## [0.3.6](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.5...v0.3.6) (2026-08-21)
 
 
 ### Bug Fixes
