@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.2...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.3...v) (2026-08-21)
+
+
+### Bug Fixes
+
+* **cd:** make GAR push optional until WIF/project ready — GHCR only for beta ([c22c431](https://github.com/Skopaq-AI/tantu-platform/commit/c22c43156d3fdbdd466f84a6d12c0a1bd91c0b46))
+
+## [0.3.3](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.2...v0.3.3) (2026-08-21)
 
 
 ### Bug Fixes

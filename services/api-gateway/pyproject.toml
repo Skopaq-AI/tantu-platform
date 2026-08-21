@@ -1,6 +1,6 @@
 [project]
 name = "tantu-api-gateway"
-version = "0.3.3"
+version = "0.3.4"
 description = "TANTU API Gateway — FastAPI + CORS + Helmet + Redis rate-limit + JWT RS256 + OPA-style RBAC/ABAC + reverse proxy + health aggregation + audit log — Clean Arch + DDD + event-driven"
 readme = "README.md"
 requires-python = ">=3.11"
