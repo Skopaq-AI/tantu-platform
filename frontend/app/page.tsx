@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowRight, Shield, Factory, Eye, Cpu, MessageSquare, Clock, Gauge, Users, Lock, Database, Check, ChevronRight, Play, FileText, Phone, Mail } from "lucide-react";
+import { ArrowRight, Shield, Factory, Eye, Cpu, MessageSquare, Clock, Gauge, Users, Lock, Database, Check, ChevronRight, Play, FileText, Phone, Mail, Brain, Sparkles, Bot, ScanEye, Zap } from "lucide-react";
 
 export default function LandingPage() {
   return (
@@ -113,6 +113,53 @@ export default function LandingPage() {
               <div className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-400">{s.d}</div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* AI DRIVEN — dual brain, edge, grounded RAG — make AI unmissable */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
+        <div className="inline-flex items-center gap-2 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-3 py-1 text-[11px] font-bold tracking-wide">
+          <Sparkles className="h-3.5 w-3.5" /> AI-DRIVEN · Dual brain · Grounded · Air-gapped option
+        </div>
+        <div className="mt-3 flex flex-wrap items-baseline justify-between gap-3">
+          <h2 className="text-[22px] sm:text-[26px] font-bold tracking-tight leading-none">Factory intelligence, <span className="text-sky-600">not just dashboards.</span></h2>
+          <span className="text-xs text-slate-500">Nemotron-9B on-prem + Gemini ER2 cloud · Qdrant RAG · &lt;40ms edge</span>
+        </div>
+        <div className="mt-6 grid lg:grid-cols-3 gap-4">
+          <div className="rounded-xl border dark:border-slate-800 bg-gradient-to-br from-slate-900 to-slate-800 text-white p-5 relative overflow-hidden">
+            <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-sky-500/20 blur-2xl" />
+            <div className="flex items-center gap-2 text-xs font-semibold tracking-wide text-sky-300"><Brain className="h-4 w-4" /> On-prem brain — air-gapped</div>
+            <div className="mt-2 font-bold leading-tight">Nemotron-9B on your box</div>
+            <div className="mt-1 text-sm leading-5 text-slate-300">Runs on Orin/Jetson, no internet needed. Answers “why did line 2 slow?” from derived events only — raw frames never leave plant. DPDP 2023 safe.</div>
+            <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] font-mono">
+              <span className="px-2 py-1 rounded bg-white/10 border border-white/15">VLLM</span><span className="px-2 py-1 rounded bg-white/10 border border-white/15">Qdrant RAG 5 docs</span><span className="px-2 py-1 rounded bg-white/10 border border-white/15">Grounded citations</span>
+            </div>
+          </div>
+          <div className="rounded-xl border dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+            <div className="flex items-center gap-2 text-xs font-semibold tracking-wide text-slate-500"><ScanEye className="h-4 w-4" /> Edge perception — &lt;40ms</div>
+            <div className="mt-2 font-bold leading-tight">Pi5+Hailo-8L / Orin Nano / Thor</div>
+            <div className="mt-1 text-sm leading-5 text-slate-600 dark:text-slate-400">Camera-as-adapter, FFT vibration, thermal, CT, gauge OCR. Dust/glare compensated, 85dB proof. <span className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border dark:border-slate-700">p95 38ms</span> on Hailo-8L.</div>
+            <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+              <div className="rounded-lg border dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2"><div className="text-slate-500 text-[11px]">Vision</div><div className="font-bold">YOLOv8-seg</div></div>
+              <div className="rounded-lg border dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2"><div className="text-slate-500 text-[11px]">Vibration</div><div className="font-bold">FFT 1kHz</div></div>
+              <div className="rounded-lg border dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2"><div className="text-slate-500 text-[11px]">Gauge</div><div className="font-bold">OCR 96%</div></div>
+            </div>
+          </div>
+          <div className="rounded-xl border dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+            <div className="flex items-center gap-2 text-xs font-semibold tracking-wide text-slate-500"><Bot className="h-4 w-4" /> Cloud brain — grounded</div>
+            <div className="mt-2 font-bold leading-tight">Gemini ER2 on derived events</div>
+            <div className="mt-1 text-sm leading-5 text-slate-600 dark:text-slate-400">Only `DefectEvent` (no image) leaves plant. RAG over Qdrant, grounded answers, vernacular `hi/ta/te/kn/en` + code-switch, one-button ACK.</div>
+            <div className="mt-3 flex items-center gap-2 text-xs">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"><Zap className="h-3 w-3" /> 22 → 3 min MTTD</span>
+              <span className="text-slate-500">Mode A/B token opt</span>
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2 text-[11px]">
+          <span className="px-2.5 py-1 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-semibold inline-flex items-center gap-1.5"><Sparkles className="h-3 w-3" /> Robotics: Fanuc · ABB · Kuka via EtherNet/IP</span>
+          <span className="px-2.5 py-1 rounded-full bg-white dark:bg-slate-900 border dark:border-slate-700">OPC-UA auto-discover (mDNS)</span>
+          <span className="px-2.5 py-1 rounded-full bg-white dark:bg-slate-900 border dark:border-slate-700">MTConnect · PROFINET · Modbus scan</span>
+          <span className="px-2.5 py-1 rounded-full bg-white dark:bg-slate-900 border dark:border-slate-700">NATS → SSE · Timescale · Qdrant</span>
         </div>
       </section>
 
