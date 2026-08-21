@@ -44,7 +44,7 @@ echo "  SA email: $SA_EMAIL"
 
 echo ""
 echo "[3/6] Granting IAM roles (least-privilege + deploy)..."
-for ROLE in artifactregistry.writer container.admin container.clusterAdmin iam.serviceAccountUser storage.admin cloudsql.editor secretmanager.secretAccessor secretmanager.viewer compute.viewer iam.workloadIdentityPoolAdmin; do
+for ROLE in artifactregistry.admin artifactregistry.writer container.admin container.clusterAdmin iam.serviceAccountAdmin iam.serviceAccountUser storage.admin cloudsql.admin secretmanager.admin secretmanager.secretAccessor secretmanager.viewer compute.admin compute.viewer iam.workloadIdentityPoolAdmin resourcemanager.projectIamAdmin serviceusage.serviceUsageAdmin; do
   echo "  + roles/$ROLE"
   gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$SA_EMAIL" --role="roles/$ROLE" --condition=None >/dev/null 2>&1 ||   gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$SA_EMAIL" --role="roles/$ROLE" >/dev/null
 done

@@ -10,16 +10,22 @@ resource "google_service_account" "deployer" {
 
 resource "google_project_iam_member" "deployer_roles" {
   for_each = toset([
+    "roles/artifactregistry.admin",
     "roles/artifactregistry.writer",
     "roles/container.admin",
     "roles/container.clusterAdmin",
+    "roles/iam.serviceAccountAdmin",
     "roles/iam.serviceAccountUser",
     "roles/storage.admin",
-    "roles/cloudsql.editor",
+    "roles/cloudsql.admin",
+    "roles/secretmanager.admin",
     "roles/secretmanager.secretAccessor",
     "roles/secretmanager.viewer",
+    "roles/compute.admin",
     "roles/compute.viewer",
     "roles/iam.workloadIdentityPoolAdmin",
+    "roles/resourcemanager.projectIamAdmin",
+    "roles/serviceusage.serviceUsageAdmin",
   ])
   project = var.project_id
   role    = each.value

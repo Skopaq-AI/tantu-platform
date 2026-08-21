@@ -35,9 +35,10 @@ provider "google-beta" {
 data "google_client_config" "default" {}
 
 # GKE cluster data source — used to configure kubernetes/helm providers after cluster exists
-# On first apply before cluster exists, these will fail gracefully; bootstrap without qdrant first.
+# On first apply before cluster exists, disable reading to avoid 404: cluster not found.
+# The kubernetes/helm providers fallback to 127.0.0.1 until GKE is ready (two-phase apply note above).
 data "google_container_cluster" "tantu" {
-  count      = var.enable_qdrant_helm ? 1 : 0
+  count      = 0 # disabled during bootstrap — enable after GKE created via var.enable_qdrant_helm + manual import
   name       = "tantu-${var.env}-gke"
   location   = var.region
   project    = var.project_id

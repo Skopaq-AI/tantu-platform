@@ -33,10 +33,6 @@ resource "google_artifact_registry_repository" "tantu" {
   cleanup_policies {
     id     = "keep-prod-images"
     action = "KEEP"
-    condition {
-      tag_state    = "TAGGED"
-      tag_prefixes = ["prod-", "v"]
-    }
     most_recent_versions { keep_count = 50 }
   }
 
