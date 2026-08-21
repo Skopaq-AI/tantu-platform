@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.4...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.5...v) (2026-08-21)
+
+
+### Bug Fixes
+
+* **terraform:** allow terraform/modules/secrets — .gitignore was blocking TF module\n\n- .gitignore had 'secrets/' which ignored terraform/modules/secrets (required for Secret Manager) — caused Infra apply to fail with 'Unreadable module directory lstat modules/secrets: no such file' and 'could not be read for module secrets at main.tf:130'\n- fix to '/.secrets/' + specific patterns, now terraform/modules/secrets is tracked\n- verified via git ls-files, now shows 3 files for secrets module ([e44f477](https://github.com/Skopaq-AI/tantu-platform/commit/e44f47735cd12c5bde3a42233ed6481fff29d2bf))
+
+## [0.3.5](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.4...v0.3.5) (2026-08-21)
 
 
 ### Bug Fixes
