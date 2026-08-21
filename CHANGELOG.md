@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.8.0...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.8.1...v) (2026-08-21)
+
+
+### Bug Fixes
+
+* **redis:** add PVC for durability (survives pod reschedule to new node) ([e381abc](https://github.com/Skopaq-AI/tantu-platform/commit/e381abc5715d382ab0be082b559e3080d93f1019))
+
+## [0.8.1](https://github.com/Skopaq-AI/tantu-platform/compare/v0.8.0...v0.8.1) (2026-08-21)
 
 
 ### Bug Fixes
