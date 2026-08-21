@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.5.1...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.6.0...v) (2026-08-21)
+
+
+### Features
+
+* **onboard:** plug-and-play one-call plant integration + gateway routing ([bc4346e](https://github.com/Skopaq-AI/tantu-platform/commit/bc4346ecc425ee3b4ffe19c08279e2ea185c9e04))
+
+# [0.6.0](https://github.com/Skopaq-AI/tantu-platform/compare/v0.5.1...v0.6.0) (2026-08-21)
 
 
 ### Features
