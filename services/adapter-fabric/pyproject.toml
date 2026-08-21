@@ -1,6 +1,6 @@
 [project]
 name = "adapter-fabric"
-version = "0.5.1"
+version = "0.6.0"
 description = "TANTU Adapter Fabric — multi-protocol shopfloor ingestion (OPC-UA, Modbus, MQTT, MTConnect, EtherNet/IP, Camera) — Hexagonal + Clean"
 readme = "README.md"
 requires-python = ">=3.11"

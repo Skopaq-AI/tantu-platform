@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.5.0...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.5.1...v) (2026-08-21)
+
+
+### Features
+
+* **landing:** highlight AI-driven dual brain + edge + grounded RAG ([0da2214](https://github.com/Skopaq-AI/tantu-platform/commit/0da221439de43ab94a64d42f302f648cc2f614c3))
+
+## [0.5.1](https://github.com/Skopaq-AI/tantu-platform/compare/v0.5.0...v0.5.1) (2026-08-21)
 
 
 ### Bug Fixes
