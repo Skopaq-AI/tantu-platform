@@ -188,8 +188,6 @@ class ModbusAdapter(BaseAdapter):
                 return 1.0 if resp.bits and resp.bits[0] else 0.0  # type: ignore
             regs = list(resp.registers)  # type: ignore
             return _decode_registers(regs, data_type)
-            else:
-                raise ValueError(f"Unsupported function code {fc}")
         except Exception as e:
             self._last_error = f"modbus read {tag}: {e}"
             # mark disconnected so next poll reconnects
