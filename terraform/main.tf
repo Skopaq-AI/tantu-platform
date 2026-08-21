@@ -192,6 +192,31 @@ module "qdrant" {
 # For terraform apply, ensure gcloud auth and GKE IAM; for CI use Workload Identity Federation
 # ──────────────────────────────────────────────
 
+
+# ──────────────────────────────────────────────
+# GitHub Actions Deployer SA + WIF (for CD + Infra workflows)
+# Creates: tantu-gha-deployer SA + github WIF pool/provider + principalSet binding
+# Use outputs to set GitHub Secrets/Vars: GCP_WIP, GCP_SA
+# ──────────────────────────────────────────────
+module "github_deployer" {
+  source         = "./modules/github-deployer"
+  project_id     = var.project_id
+  project_number = data.google_project.current.number
+  github_owner   = var.github_owner != "" ? var.github_owner : "Skopaq-AI"
+  github_repo    = var.github_repo != "" ? var.github_repo : "tantu-platform"
+  pool_id        = "github"
+  provider_id    = "github-provider"
+  sa_id          = "tantu-gha-deployer"
+  # TF state bucket is created by gcp-beta-apply.sh; set true here if you want TF to manage it
+  create_state_bucket = var.create_state_bucket
+
+  depends_on = [google_project_service.required]
+}
+
+data "google_project" "current" {
+  project_id = var.project_id
+}
+
 # Argo Rollouts controller — installed via Helm in GKE module (see modules/gke)
 # Gateway + HTTPRoute + Rollout manifests live in infra/k8s/ (values.yaml, gateway.yaml, rollout.yaml)
 # Apply after Terraform: kubectl apply -f infra/k8s/ or via ArgoCD

@@ -96,3 +96,16 @@ output "gateway_address" {
   value       = try(module.gke.gateway_address, null)
   description = "Gateway external IP (if provisioned)"
 }
+
+output "deployer_sa_email" {
+  value       = module.github_deployer.deployer_sa_email
+  description = "GitHub Actions deployer SA email — set GitHub var GCP_SA / GCP_WIF_SERVICE_ACCOUNT"
+}
+output "deployer_wif_provider" {
+  value       = module.github_deployer.wif_provider_name
+  description = "WIF provider full name — set GitHub var GCP_WIP / GCP_WIF_PROVIDER"
+}
+output "deployer_wif_pool" {
+  value       = module.github_deployer.wif_pool_name
+  description = "WIF pool full name"
+}
