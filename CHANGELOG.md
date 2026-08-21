@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.14...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.4.0...v) (2026-08-21)
+
+
+### Features
+
+* **landing:** customer marketing page (sales) — split hero, dark proof strip, how-it-works line, persona benefits, mono integrations, security tenancy, pricing table, CTA; dash live data removed from public / (still at /operator etc behind auth) ([d9c29dd](https://github.com/Skopaq-AI/tantu-platform/commit/d9c29dd933291fefc44182832f21c624908fc9c2))
+
+# [0.4.0](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.14...v0.4.0) (2026-08-21)
 
 
 ### Features
