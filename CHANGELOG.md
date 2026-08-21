@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.9...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.10...v) (2026-08-21)
+
+
+### Bug Fixes
+
+* **terraform:** unblock apply — postgres flags + GKE WI bootstrap ([b81116c](https://github.com/Skopaq-AI/tantu-platform/commit/b81116c159b9177c49f1a9825b5d9066e1462e39))
+
+## [0.3.10](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.9...v0.3.10) (2026-08-21)
 
 
 ### Bug Fixes
