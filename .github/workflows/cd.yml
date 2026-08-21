@@ -190,9 +190,13 @@ jobs:
           GHCR_TAGS="${{ steps.meta-ghcr.outputs.tags }}"
           GAR_TAGS="${{ steps.meta-gar.outputs.tags }}"
           TAGS="$(echo "$GHCR_TAGS" | tr '\n' ',' | sed 's/,$//')"
-          if [ -n "$GAR_TAGS" ] && [ "${{ env.GCP_PROJECT_ID }}" != "" ]; then
+          # Only include GAR if WIF is configured (project exists and secrets set) — otherwise GAR push would fail pending project creation
+          if [ -n "$GAR_TAGS" ] && [ "${{ env.GCP_PROJECT_ID }}" != "" ] && [ -n "${{ env.GCP_WIF_PROVIDER }}" ] && [ -n "${{ secrets.GCP_WIP || '' }}" ]; then
+            echo "::notice::Including GAR tags for ${{ env.GCP_PROJECT_ID }}"
             GAR_CSV="$(echo "$GAR_TAGS" | tr '\n' ',' | sed 's/,$//')"
             TAGS="$TAGS,$GAR_CSV"
+          else
+            echo "::notice::Skipping GAR — WIF not configured or project not yet created (tantu-beta-20260821-01), pushing to GHCR only"
           fi
           if [ -z "$TAGS" ] || [ "$TAGS" = "," ]; then
             TAGS="${{ env.REGISTRY_GHCR }}/${{ github.repository_owner }}/tantu-${{ matrix.service }}:${{ env.VERSION }},${{ env.REGISTRY_GHCR }}/${{ github.repository_owner }}/tantu-${{ matrix.service }}:latest"
