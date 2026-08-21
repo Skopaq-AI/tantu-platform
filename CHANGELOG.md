@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.4.0...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.5.0...v) (2026-08-21)
+
+
+### Bug Fixes
+
+* **gateway,helm:** harden autopilot scheduling, remove argo gatewayAPI plugin, add downstream microservices ([1b5c17d](https://github.com/Skopaq-AI/tantu-platform/commit/1b5c17d407f0836a87fef4c1cc4b971a848bc786))
+
+# [0.5.0](https://github.com/Skopaq-AI/tantu-platform/compare/v0.4.0...v0.5.0) (2026-08-21)
 
 
 ### Features
