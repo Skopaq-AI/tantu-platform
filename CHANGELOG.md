@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.0...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.1...v) (2026-08-21)
+
+
+### Bug Fixes
+
+* **ci:** paho-mqtt 2.1 compat + make ruff lint non-blocking for beta ([57443fa](https://github.com/Skopaq-AI/tantu-platform/commit/57443fafced27e782f4badef01ad8b1123ab7f8d))
+
+## [0.3.1](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.0...v0.3.1) (2026-08-21)
 
 
 ### Bug Fixes
