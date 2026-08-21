@@ -19,16 +19,7 @@ spec:
       port: 80
       allowedRoutes:
         namespaces: { from: Same }
-      # Redirect HTTP -> HTTPS in prod (add https listener below)
-    - name: https
-      protocol: HTTPS
-      port: 443
-      allowedRoutes:
-        namespaces: { from: Same }
-      tls:
-        mode: Terminate
-        # Use Google-managed cert: create ManagedCertificate and reference via annotation
-        # certificateRefs: [{ name: tantu-managed-cert }]
+      # HTTP only for dev — add HTTPS+ManagedCertificate in prod
   addresses:
     - type: NamedAddress
       value: tantu-ENV-gke-gateway-ip
