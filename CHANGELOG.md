@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.7.0...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.7.1...v) (2026-08-21)
+
+
+### Bug Fixes
+
+* **modbus:** remove stray else after _decode_registers (SyntaxError in 907277f) ([bd665b9](https://github.com/Skopaq-AI/tantu-platform/commit/bd665b9cab73df56821ef2b25fe56c07be9285ae))
+
+## [0.7.1](https://github.com/Skopaq-AI/tantu-platform/compare/v0.7.0...v0.7.1) (2026-08-21)
 
 
 ### Bug Fixes
