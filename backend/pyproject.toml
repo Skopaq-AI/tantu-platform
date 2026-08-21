@@ -1,6 +1,6 @@
 [project]
 name = "tantu-backend"
-version = "0.3.7"
+version = "0.3.8"
 description = "TANTU backend — Clean Arch, FastAPI, GENAI-ready"
 requires-python = ">=3.11"
 dependencies = [

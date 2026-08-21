@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.6...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.7...v) (2026-08-21)
+
+
+### Bug Fixes
+
+* **terraform:** sync IAM outputs with remote 87e4168 — alias outputs already applied ([c6d27b1](https://github.com/Skopaq-AI/tantu-platform/commit/c6d27b105b5db4458748a0e88ec56b69e4111cd0))
+
+## [0.3.7](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.6...v0.3.7) (2026-08-21)
 
 
 ### Bug Fixes
