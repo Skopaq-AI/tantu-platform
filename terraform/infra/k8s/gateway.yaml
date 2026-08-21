@@ -32,7 +32,7 @@ metadata:
 spec:
   parentRefs:
     - name: tantu-gateway
-  hostnames: ["api.tantu.example.com"] # replace with real domain
+  hostnames: ["api.tantu.example.com", "8.233.79.240"] # IP added so http://8.233.79.240/ matches — was only api.tantu.example.com causing 404 fault filter abort for IP
   rules:
     - matches:
         - path: { type: PathPrefix, value: /api }
