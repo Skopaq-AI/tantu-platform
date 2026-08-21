@@ -235,3 +235,4 @@ Enabled: private cluster, private service networking, no public DB/Redis, `requi
 ---
 *Generated for TANTU Platform — region asia-south1, Terraform google ~>5.0, GCS backend, Autopilot + Gateway API + Argo Rollouts canary.*
 
+# Infra trigger for tantu-beta-20260821-01 2026-08-21T03:06:15Z
