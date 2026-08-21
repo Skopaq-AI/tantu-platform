@@ -14,10 +14,13 @@ resource "google_project_iam_member" "bindings" {
   member   = "serviceAccount:${google_service_account.tantu[each.value.k].email}"
 }
 
-# Workload Identity binding (GSA → KSA)
-resource "google_service_account_iam_member" "wi" {
-  for_each           = var.workload_identity_bindings
-  service_account_id = google_service_account.tantu[each.key].name
-  role               = "roles/iam.workloadIdentityUser"
-  member             = "serviceAccount:${var.project_id}.svc.id.goog[${each.key}]"
-}
+# Workload Identity binding (GSA → KSA) — DISABLED for bootstrap
+# This requires GKE cluster's pool PROJECT_ID.svc.id.goog to exist (auto-created with GKE workload_identity_config).
+# On first apply, GKE not yet created → fails 400 Identity Pool does not exist. So we skip it on initial apply
+# and will be added back after GKE is READY (second apply). See main.tf comment.
+# resource "google_service_account_iam_member" "wi" {
+#   for_each           = var.workload_identity_bindings
+#   service_account_id = google_service_account.tantu[each.key].name
+#   role               = "roles/iam.workloadIdentityUser"
+#   member             = "serviceAccount:${var.project_id}.svc.id.goog[${each.key}]"
+# }

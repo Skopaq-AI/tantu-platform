@@ -55,14 +55,6 @@ resource "google_sql_database_instance" "postgres" {
     }
 
     database_flags {
-      name  = "shared_preload_libraries"
-      value = "timescaledb,pg_stat_statements"
-    }
-    database_flags {
-      name  = "max_connections"
-      value = "200"
-    }
-    database_flags {
       name  = "log_min_duration_statement"
       value = "1000" # log slow queries >1s
     }
@@ -71,7 +63,11 @@ resource "google_sql_database_instance" "postgres" {
       value = "on"
     }
 
-    # DPDP / residency: ensure PGCrypto, audit
+    # pgaudit — use Cloud SQL flag; shared_preload_libraries and max_connections are not valid Cloud SQL flags for Postgres 16 (removed — was 404 invalidFlagName)
+    database_flags {
+      name  = "cloudsql.enable_pgaudit"
+      value = "on"
+    }
     database_flags {
       name  = "pgaudit.log"
       value = "ddl,write"
