@@ -7,11 +7,11 @@ Real paths (when TTS_URL / STT_URL env are set):
 Fallback: deterministic placeholder that still honors hi/ta/te/kn and code-switch,
 so the API contract is exercisable without external services.
 """
+
 from __future__ import annotations
 
 import base64
 import logging
-import time
 from typing import Optional
 
 import httpx
@@ -23,9 +23,15 @@ log = logging.getLogger(__name__)
 
 
 class TtsSttService:
-    def __init__(self, tts_url: Optional[str] = None, stt_url: Optional[str] = None, timeout_s: float = 6.0):
-        self.tts_url = (tts_url or settings.tts_url).rstrip("/") if (tts_url or settings.tts_url) else ""
-        self.stt_url = (stt_url or settings.stt_url).rstrip("/") if (stt_url or settings.stt_url) else ""
+    def __init__(
+        self, tts_url: Optional[str] = None, stt_url: Optional[str] = None, timeout_s: float = 6.0
+    ):
+        self.tts_url = (
+            (tts_url or settings.tts_url).rstrip("/") if (tts_url or settings.tts_url) else ""
+        )
+        self.stt_url = (
+            (stt_url or settings.stt_url).rstrip("/") if (stt_url or settings.stt_url) else ""
+        )
         self.timeout_s = timeout_s
 
     # -- TTS -----------------------------------------------------------------

@@ -1,14 +1,14 @@
 """Postgres — SQLAlchemy async, best-effort audit log table."""
+
 from __future__ import annotations
 
 import logging
-import os
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncEngine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import String, Integer, Float, Text, DateTime, func, JSON
-from datetime import datetime, timezone
+from sqlalchemy import String, Integer, Float, Text, DateTime, func
+from datetime import datetime
 
 from .config import settings
 

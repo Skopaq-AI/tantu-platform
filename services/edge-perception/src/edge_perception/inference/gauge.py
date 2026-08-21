@@ -51,7 +51,11 @@ class GaugeConfig:
         return self.min_value + frac * (self.max_value - self.min_value)
 
     def value_to_angle(self, value: float) -> float:
-        frac = (value - self.min_value) / (self.max_value - self.min_value) if self.max_value != self.min_value else 0.0
+        frac = (
+            (value - self.min_value) / (self.max_value - self.min_value)
+            if self.max_value != self.min_value
+            else 0.0
+        )
         frac = max(0.0, min(1.0, frac))
         return (self.min_angle_deg - frac * self.span_deg) % 360.0
 
@@ -176,7 +180,9 @@ def read_gauge(image: np.ndarray, config: GaugeConfig | None = None) -> GaugeRes
     # mask edges to dial interior again (dilation leaks)
     edges = cv2.bitwise_and(edges, edges, mask=mask)
 
-    lines = cv2.HoughLinesP(edges, rho=1, theta=np.pi / 180, threshold=40, minLineLength=r * 0.45, maxLineGap=8)
+    lines = cv2.HoughLinesP(
+        edges, rho=1, theta=np.pi / 180, threshold=40, minLineLength=r * 0.45, maxLineGap=8
+    )
 
     angle_deg: float | None = None
     line_strength = 0.0

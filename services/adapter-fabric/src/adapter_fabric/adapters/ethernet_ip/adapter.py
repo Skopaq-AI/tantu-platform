@@ -7,6 +7,7 @@ Implements:
  - Falls back to synthetic readings when PLC not reachable
  - pycomm3 LogixDriver integration when available (real Rockwell path)
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -22,6 +23,7 @@ from ..base import BaseAdapter
 
 try:
     from pycomm3 import LogixDriver  # type: ignore
+
     _HAS_PYCOMM3 = True
 except Exception:  # pragma: no cover
     _HAS_PYCOMM3 = False
@@ -46,7 +48,14 @@ CIP_SVC_WRITE_TAG = 0x4D
 SEG_SYMBOL = 0x91
 
 
-def build_eip_header(command: int, length: int, session_handle: int = 0, status: int = 0, sender_context: bytes = b"\x00" * 8, options: int = 0) -> bytes:
+def build_eip_header(
+    command: int,
+    length: int,
+    session_handle: int = 0,
+    status: int = 0,
+    sender_context: bytes = b"\x00" * 8,
+    options: int = 0,
+) -> bytes:
     """Build 24-byte EIP encapsulation header — little-endian.
 
     Layout (Vol2 Table 2-2.1):
@@ -71,7 +80,9 @@ def build_eip_header(command: int, length: int, session_handle: int = 0, status:
 def parse_eip_header(data: bytes) -> Dict[str, Any]:
     if len(data) < 24:
         raise ValueError(f"EIP header too short: {len(data)}")
-    command, length, session_handle, status, sender_context, options = struct.unpack("<HHI I 8s I", data[:24])
+    command, length, session_handle, status, sender_context, options = struct.unpack(
+        "<HHI I 8s I", data[:24]
+    )
     return {
         "command": command,
         "length": length,
@@ -83,7 +94,12 @@ def parse_eip_header(data: bytes) -> Dict[str, Any]:
     }
 
 
-def build_cip_epath(class_id: Optional[int] = None, instance_id: Optional[int] = None, attribute_id: Optional[int] = None, tag_name: Optional[str] = None) -> bytes:
+def build_cip_epath(
+    class_id: Optional[int] = None,
+    instance_id: Optional[int] = None,
+    attribute_id: Optional[int] = None,
+    tag_name: Optional[str] = None,
+) -> bytes:
     """Build CIP EPATH byte sequence."""
     out = bytearray()
 
@@ -124,7 +140,9 @@ def build_cip_get_attribute_single(class_id: int, instance_id: int, attribute_id
     return struct.pack("BB", CIP_SVC_GET_ATTR_SINGLE, epath_words) + epath
 
 
-def build_send_rr_data(session_handle: int, cip_payload: bytes, interface_handle: int = 0, timeout: int = 10) -> bytes:
+def build_send_rr_data(
+    session_handle: int, cip_payload: bytes, interface_handle: int = 0, timeout: int = 10
+) -> bytes:
     """Wrap CIP payload in SendRRData (EIP command 0x6F) with CPF."""
     cpf = struct.pack("<I H H", interface_handle, timeout, 2)
     cpf += struct.pack("<H H", 0x0000, 0)
@@ -206,7 +224,9 @@ class RawEipClient:
     def close(self) -> None:
         if self._sock:
             try:
-                hdr = build_eip_header(EIP_CMD_UNREGISTER_SESSION, 0, session_handle=self._session_handle)
+                hdr = build_eip_header(
+                    EIP_CMD_UNREGISTER_SESSION, 0, session_handle=self._session_handle
+                )
                 self._sock.sendall(hdr)
             except Exception:
                 pass
@@ -328,6 +348,7 @@ class EthernetIpAdapter(BaseAdapter):
     async def _read_tag(self, tag: str, data_type: str) -> Optional[float]:
         if self._driver is not None:
             try:
+
                 def _read():
                     result = self._driver.read(tag)  # type: ignore
                     if result is None:
@@ -365,14 +386,24 @@ class EthernetIpAdapter(BaseAdapter):
         for tm in self.config.tags:
             if tm.source_tags:
                 continue
-            dtype = dtype_map.get(tm.source_tag, tm.data_type if tm.data_type != "float" else "REAL")
+            dtype = dtype_map.get(
+                tm.source_tag, tm.data_type if tm.data_type != "float" else "REAL"
+            )
             raw = await self._read_tag(tm.source_tag, dtype)
             if raw is None:
                 continue
             fval = normalize_raw_value(raw, tm)
             raw_cache[tm.source_tag] = fval
             value = apply_tag_mapping(fval, tm)
-            readings.append(self._reading(metric=tm.metric, value=value, unit=tm.unit, source_tag=tm.source_tag, raw_value=fval))
+            readings.append(
+                self._reading(
+                    metric=tm.metric,
+                    value=value,
+                    unit=tm.unit,
+                    source_tag=tm.source_tag,
+                    raw_value=fval,
+                )
+            )
 
         for tm in self.config.tags:
             if not tm.source_tags:
@@ -397,7 +428,14 @@ class EthernetIpAdapter(BaseAdapter):
                 value = compound(raw_by_var, tm)
             except Exception:
                 continue
-            readings.append(self._reading(metric=tm.metric, value=value, unit=tm.unit, source_tag=",".join(tm.source_tags.values())))
+            readings.append(
+                self._reading(
+                    metric=tm.metric,
+                    value=value,
+                    unit=tm.unit,
+                    source_tag=",".join(tm.source_tags.values()),
+                )
+            )
 
         if readings:
             self._last_ok_ts = time.time()

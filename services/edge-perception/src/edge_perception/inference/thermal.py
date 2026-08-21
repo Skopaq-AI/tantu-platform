@@ -10,9 +10,8 @@ the calibration math is real and tested.
 from __future__ import annotations
 
 import json
-import os
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 
@@ -79,7 +78,23 @@ class ThermalConfig:
 
     @classmethod
     def from_dict(cls, d: dict) -> "ThermalConfig":
-        return cls(**{k: d[k] for k in ["probe_id", "unit", "offset", "scale", "c2", "c3", "min_valid", "max_valid", "max_rate_c_per_s"] if k in d})
+        return cls(
+            **{
+                k: d[k]
+                for k in [
+                    "probe_id",
+                    "unit",
+                    "offset",
+                    "scale",
+                    "c2",
+                    "c3",
+                    "min_valid",
+                    "max_valid",
+                    "max_rate_c_per_s",
+                ]
+                if k in d
+            }
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,10 +146,20 @@ class ThermalProbe:
         self.config = cfg
         self.save_calibration()
 
-    def calibrate_two_point(self, raw_low: float, ref_low: float, raw_high: float, ref_high: float) -> ThermalConfig:
-        cfg = ThermalConfig.from_two_point(self.config.probe_id, raw_low, ref_low, raw_high, ref_high,
-                                           unit=self.config.unit, min_valid=self.config.min_valid,
-                                           max_valid=self.config.max_valid, max_rate_c_per_s=self.config.max_rate_c_per_s)
+    def calibrate_two_point(
+        self, raw_low: float, ref_low: float, raw_high: float, ref_high: float
+    ) -> ThermalConfig:
+        cfg = ThermalConfig.from_two_point(
+            self.config.probe_id,
+            raw_low,
+            ref_low,
+            raw_high,
+            ref_high,
+            unit=self.config.unit,
+            min_valid=self.config.min_valid,
+            max_valid=self.config.max_valid,
+            max_rate_c_per_s=self.config.max_rate_c_per_s,
+        )
         self.update_calibration(cfg)
         return cfg
 
@@ -145,9 +170,10 @@ class ThermalProbe:
         # format: two lines, second contains t=XXXXX (millicelsius)
         candidates = [
             f"/sys/bus/w1/devices/{self.config.probe_id}/w1_slave",
-            f"/sys/bus/w1/devices/28-*/w1_slave",
+            "/sys/bus/w1/devices/28-*/w1_slave",
         ]
         import glob as _glob
+
         for pat in candidates:
             for path in _glob.glob(pat):
                 try:
@@ -158,11 +184,13 @@ class ThermalProbe:
                     idx = txt.find("t=")
                     if idx == -1:
                         continue
-                    raw_millic = int(txt[idx + 2:].strip().split()[0])
+                    raw_millic = int(txt[idx + 2 :].strip().split()[0])
                     return raw_millic / 1000.0
                 except Exception:
                     continue
-        raise FileNotFoundError(f"no 1-Wire device found for probe_id={self.config.probe_id!r}; inject read_fn for test/synthetic")
+        raise FileNotFoundError(
+            f"no 1-Wire device found for probe_id={self.config.probe_id!r}; inject read_fn for test/synthetic"
+        )
 
     def read(self) -> ThermalResult:
         t0 = time.perf_counter()
@@ -175,7 +203,9 @@ class ThermalProbe:
         quality = "good"
         if not (self.config.min_valid <= value <= self.config.max_valid):
             quality = "bad"
-            notes.append(f"out_of_range: {value:.2f} not in [{self.config.min_valid},{self.config.max_valid}]")
+            notes.append(
+                f"out_of_range: {value:.2f} not in [{self.config.min_valid},{self.config.max_valid}]"
+            )
         # rate check
         if self._last_value is not None and self._last_ts is not None:
             dt = max(1e-3, ts - self._last_ts)

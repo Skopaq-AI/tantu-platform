@@ -1,4 +1,5 @@
 """Rate limiting — sliding window (in-memory; Redis-ready stub)."""
+
 from __future__ import annotations
 
 import time

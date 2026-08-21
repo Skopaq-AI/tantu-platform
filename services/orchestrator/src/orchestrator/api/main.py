@@ -1,13 +1,14 @@
 """Orchestrator FastAPI app — ingest, reports, window, health + NATS subscriber."""
+
 from __future__ import annotations
 
 import time
 import logging
 import uuid
 from contextlib import asynccontextmanager
-from typing import Optional, List, Any
+from typing import Optional, List
 
-from fastapi import FastAPI, Request, HTTPException, status
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -71,6 +72,7 @@ app.add_middleware(
 
 # ── Pydantic ingress ───────────────────────────────────────────────
 
+
 class IngestRequest(BaseModel):
     station_id: str = Field(..., example="line2-cluster1-gauge3")
     defect_class: str = Field("none", example="pressure_drift")
@@ -91,6 +93,7 @@ class IngestResponse(BaseModel):
 
 
 # ── Health ─────────────────────────────────────────────────────────
+
 
 @app.get("/health", tags=["ops"])
 async def health():
@@ -116,6 +119,7 @@ async def ready():
     try:
         from sqlalchemy import text as _text
         from ..infra.db import get_engine
+
         eng = get_engine()
         async with eng.connect() as conn:
             await conn.execute(_text("SELECT 1"))
@@ -133,6 +137,7 @@ async def get_window():
 
 
 # ── Ingest (HTTP ingress mirrors NATS path, shares idempotency) ─────
+
 
 def _to_domain(body: IngestRequest) -> DefectEvent:
     try:
@@ -175,11 +180,18 @@ async def ingest_batch(bodies: List[IngestRequest]):
     for b in bodies:
         ev = _to_domain(b)
         escalated, report = await _service.ingest(ev)
-        results.append({"event_id": ev.event_id, "escalated": escalated, "report": report.to_dict() if report else None})
+        results.append(
+            {
+                "event_id": ev.event_id,
+                "escalated": escalated,
+                "report": report.to_dict() if report else None,
+            }
+        )
     return {"results": results}
 
 
 # ── Reports ─────────────────────────────────────────────────────────
+
 
 @app.get("/reports", tags=["reports"])
 async def reports(limit: int = 20, plant_id: Optional[str] = None):
@@ -207,6 +219,7 @@ async def report_by_id(report_id: str):
 
 
 # ── Debug: clear state ──────────────────────────────────────────────
+
 
 @app.post("/debug/clear", tags=["debug"], include_in_schema=False)
 async def debug_clear():

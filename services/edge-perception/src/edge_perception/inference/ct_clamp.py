@@ -12,7 +12,7 @@ import time
 from dataclasses import dataclass
 
 import numpy as np
-from scipy.signal import find_peaks, get_window
+from scipy.signal import get_window
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,12 +68,19 @@ def analyze_ct(
     if rms < 0.04:
         # essentially off / open clamp
         return CTClampResult(
-            rms_a=rms, peak_a=peak, crest_factor=crest, thd_percent=0.0,
-            fundamental_hz=mains_hz, fundamental_mag=0.0,
-            harmonics={}, signature="off" if rms < 0.015 else "unknown",
+            rms_a=rms,
+            peak_a=peak,
+            crest_factor=crest,
+            thd_percent=0.0,
+            fundamental_hz=mains_hz,
+            fundamental_mag=0.0,
+            harmonics={},
+            signature="off" if rms < 0.015 else "unknown",
             power_proxy_w=rms * nominal_vrms,
-            latency_ms=(time.perf_counter() - t0) * 1000, n_samples=n,
-            sample_rate_hz=float(sample_rate_hz), quality="good" if rms < 0.015 else "uncertain",
+            latency_ms=(time.perf_counter() - t0) * 1000,
+            n_samples=n,
+            sample_rate_hz=float(sample_rate_hz),
+            quality="good" if rms < 0.015 else "uncertain",
         )
 
     spec = np.fft.rfft(xw)

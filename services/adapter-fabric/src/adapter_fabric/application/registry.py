@@ -1,4 +1,5 @@
 """Adapter registry — factory + lifecycle manager."""
+
 from __future__ import annotations
 
 import asyncio
@@ -96,7 +97,14 @@ class AdapterRegistry:
                     }
                 )
             except Exception as e:
-                out.append({"adapter_id": ad.adapter_id, "protocol": ad.protocol, "status": "down", "last_error": str(e)})
+                out.append(
+                    {
+                        "adapter_id": ad.adapter_id,
+                        "protocol": ad.protocol,
+                        "status": "down",
+                        "last_error": str(e),
+                    }
+                )
         return out
 
     async def stop_all(self) -> None:

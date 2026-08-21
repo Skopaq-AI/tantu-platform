@@ -1,10 +1,10 @@
 """RAG grounding tests — chunking, embeddings, Qdrant/mem, citations."""
+
 import pytest
 from reasoning_copilot.rag.chunker import chunk_text, chunk_document
 from reasoning_copilot.rag.embeddings import Embedder, cosine_similarity
 from reasoning_copilot.rag.store import RagStore, Document
 from reasoning_copilot.rag.citations import format_context, build_citations
-import numpy as np
 
 
 def test_chunker_basic():
@@ -42,9 +42,27 @@ def test_embedder_hash_cosine_real():
 def test_embedder_cosine_search_grounded():
     store = RagStore(collection="test_grounding_" + str(id(object())), embedder=Embedder(dim=64))
     store.clear()
-    store.add(Document(id="runbook-press-01", text="Line 2 pressure high (>8 bar): check valve 3, max safe 8 bar.", metadata={"plant_id": "plant-demo-01"}))
-    store.add(Document(id="runbook-vib-01", text="Vibration RMS >4.5 mm/s indicates bearing wear, schedule replacement.", metadata={"plant_id": "plant-demo-01"}))
-    store.add(Document(id="unrelated", text="Canteen menu: samosa and chai at 4pm.", metadata={"plant_id": "plant-demo-01"}))
+    store.add(
+        Document(
+            id="runbook-press-01",
+            text="Line 2 pressure high (>8 bar): check valve 3, max safe 8 bar.",
+            metadata={"plant_id": "plant-demo-01"},
+        )
+    )
+    store.add(
+        Document(
+            id="runbook-vib-01",
+            text="Vibration RMS >4.5 mm/s indicates bearing wear, schedule replacement.",
+            metadata={"plant_id": "plant-demo-01"},
+        )
+    )
+    store.add(
+        Document(
+            id="unrelated",
+            text="Canteen menu: samosa and chai at 4pm.",
+            metadata={"plant_id": "plant-demo-01"},
+        )
+    )
 
     hits = store.search("pressure valve 3", top_k=2)
     assert len(hits) >= 1
@@ -68,7 +86,11 @@ def test_rag_store_qdrant_or_mem_backend():
 def test_citations_format_and_build():
     store = RagStore(collection="test_cite_" + str(id(object())), embedder=Embedder(dim=32))
     store.clear()
-    store.add(Document(id="doc-a", text="valve 3 torque 12 Nm, check regulator", metadata={"type": "runbook"}))
+    store.add(
+        Document(
+            id="doc-a", text="valve 3 torque 12 Nm, check regulator", metadata={"type": "runbook"}
+        )
+    )
     hits = store.search("valve 3 torque", top_k=1)
     ctx = format_context(hits)
     assert "[doc:" in ctx
@@ -87,8 +109,23 @@ async def test_ask_grounded_via_api():
 
     with TestClient(app) as client:
         # ensure we ingested something unique
-        client.post("/rag/ingest", json={"id": "runbook-test-ground", "text": "UniqueTokenXYZ: Line 9 hydraulic leak — tighten coupling B.", "metadata": {"plant_id": "plant-demo-01"}})
-        resp = client.post("/ask", json={"question": "UniqueTokenXYZ leak what to do?", "plant_id": "plant-demo-01", "lang": "en", "top_k": 3})
+        client.post(
+            "/rag/ingest",
+            json={
+                "id": "runbook-test-ground",
+                "text": "UniqueTokenXYZ: Line 9 hydraulic leak — tighten coupling B.",
+                "metadata": {"plant_id": "plant-demo-01"},
+            },
+        )
+        resp = client.post(
+            "/ask",
+            json={
+                "question": "UniqueTokenXYZ leak what to do?",
+                "plant_id": "plant-demo-01",
+                "lang": "en",
+                "top_k": 3,
+            },
+        )
         assert resp.status_code == 200, resp.text
         data = resp.json()
         assert "answer" in data

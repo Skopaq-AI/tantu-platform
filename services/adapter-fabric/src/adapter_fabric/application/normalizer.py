@@ -1,10 +1,10 @@
 """Normalizer — ensures readings conform to canonical schema and optionally derives defects."""
+
 from __future__ import annotations
 
 from typing import Optional
 
 from ..domain.events import DefectClass, DefectEvent, NormalizedReading, Quality, Track
-from ..domain.models import TagMapping
 
 
 # Simple threshold-based defect detection from reading value.

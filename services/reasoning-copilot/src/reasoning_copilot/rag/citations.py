@@ -1,4 +1,5 @@
 """Citation helpers — build grounded context windows."""
+
 from __future__ import annotations
 
 from typing import List
@@ -14,11 +15,18 @@ def format_context(hits, max_chars: int = 4000) -> str:
             break
         parts.append(block)
         total += len(block)
-    return "\n---\n".join(parts) if parts else "(no relevant docs — answer must say needs human check)"
+    return (
+        "\n---\n".join(parts) if parts else "(no relevant docs — answer must say needs human check)"
+    )
 
 
 def build_citations(hits) -> List[dict]:
     return [
-        {"doc_id": h.doc_id, "score": round(float(h.score), 4), "text_snippet": h.text[:200], "metadata": h.metadata}
+        {
+            "doc_id": h.doc_id,
+            "score": round(float(h.score), 4),
+            "text_snippet": h.text[:200],
+            "metadata": h.metadata,
+        }
         for h in hits
     ]

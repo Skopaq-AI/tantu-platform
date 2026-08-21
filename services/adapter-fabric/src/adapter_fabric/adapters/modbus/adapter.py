@@ -4,9 +4,9 @@ Supports coils, discrete inputs, holding registers, input registers.
 Handles scale/offset, data_type coercion, float32 from two registers,
 and tag-map compounding.
 """
+
 from __future__ import annotations
 
-import asyncio
 import struct
 import time
 from typing import Any, Dict, List, Optional
@@ -18,7 +18,6 @@ from ..base import BaseAdapter
 
 try:
     from pymodbus.client import AsyncModbusTcpClient  # type: ignore
-    from pymodbus.exceptions import ModbusException  # type: ignore
 
     _HAS_PYMODBUS = True
 except Exception:  # pragma: no cover

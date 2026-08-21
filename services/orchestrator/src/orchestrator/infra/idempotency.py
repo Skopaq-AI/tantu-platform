@@ -2,6 +2,7 @@
 
 Keys are stable dedupe_key (event_id) or composite (plant_id + window hash).
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -102,6 +103,7 @@ class IdempotencyStore:
             Session = get_sessionmaker()
             async with Session() as s:
                 from sqlalchemy import delete
+
                 await s.execute(delete(IdempotencyRow))
                 await s.commit()
         except Exception:

@@ -4,10 +4,10 @@ Real path: sentence-transformers (e.g. all-MiniLM-L6-v2, 384-dim).
 Stub fallback: deterministic hash-embedding with L2 norm + real cosine similarity,
 so RAG grounding tests pass without downloading a 90MB model.
 """
+
 from __future__ import annotations
 
 import hashlib
-import math
 import logging
 from typing import List
 
@@ -24,7 +24,7 @@ except Exception:  # pragma: no cover
 
 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
-    denom = (np.linalg.norm(a) * np.linalg.norm(b))
+    denom = np.linalg.norm(a) * np.linalg.norm(b)
     if denom == 0:
         return 0.0
     return float(np.dot(a, b) / denom)
@@ -46,7 +46,7 @@ def _hash_embed_one(text: str, dim: int = 384) -> np.ndarray:
         vec[idx] += sign * w
     # add char bigram signal for OOV robustness
     for i in range(len(text) - 1):
-        bg = text[i:i+2].lower()
+        bg = text[i : i + 2].lower()
         h = int(hashlib.md5(bg.encode()).hexdigest()[:8], 16)
         idx = h % dim
         vec[idx] += 0.15

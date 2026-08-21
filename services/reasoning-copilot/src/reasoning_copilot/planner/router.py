@@ -1,4 +1,5 @@
 """Dual router — routes by air_gapped flag, with grounded generation."""
+
 from __future__ import annotations
 
 import json
@@ -6,7 +7,6 @@ import logging
 from dataclasses import dataclass
 from typing import Any, List, Optional
 
-from ..config import settings
 from .gemini_client import GeminiClient
 from .nemotron_client import NemotronClient
 from .grounding import hallucination_guard
@@ -64,11 +64,17 @@ class DualRouter:
         from .prompts import get_prompt
 
         tpl = get_prompt(prompt_name)
-        guarded = hallucination_guard(raw["text"], rag_doc_ids, rag_context, require_citation=tpl.require_citations)
+        guarded = hallucination_guard(
+            raw["text"], rag_doc_ids, rag_context, require_citation=tpl.require_citations
+        )
         raw["text"] = guarded
         raw["backend"] = backend
         raw["air_gapped"] = air_gapped
-        raw["guarded"] = guarded != raw.get("text", "") or "[needs human check" in guarded or "[ungrounded]" in guarded
+        raw["guarded"] = (
+            guarded != raw.get("text", "")
+            or "[needs human check" in guarded
+            or "[ungrounded]" in guarded
+        )
         return raw
 
     async def answer(

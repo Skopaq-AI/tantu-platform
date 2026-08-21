@@ -1,7 +1,13 @@
 """Hallucination guard tests — grounding_check + hallucination_guard."""
+
 import pytest
-from reasoning_copilot.planner.grounding import grounding_check, hallucination_guard, estimate_tokens, cost_usd
-from reasoning_copilot.rag.store import RagStore, Document
+from reasoning_copilot.planner.grounding import (
+    grounding_check,
+    hallucination_guard,
+    estimate_tokens,
+    cost_usd,
+)
+from reasoning_copilot.rag.store import RagStore
 from reasoning_copilot.rag.embeddings import Embedder
 
 
@@ -14,7 +20,9 @@ def test_estimate_tokens_and_cost():
 
 
 def test_grounding_check_has_citation():
-    sig = grounding_check("Check valve 3 [doc:runbook-press-01]", ["runbook-press-01#chunk0"], require_citation=True)
+    _sig = grounding_check(
+        "Check valve 3 [doc:runbook-press-01]", ["runbook-press-01#chunk0"], require_citation=True
+    )
     # but our check expects exact match? rag_doc_ids may be chunk ids
     # test with exact id
     sig2 = grounding_check("answer [doc:abc#chunk0]", ["abc#chunk0"], True)
@@ -39,10 +47,14 @@ def test_hallucination_guard_appends_needs_human_check():
     out = hallucination_guard("The pressure is 15 bar at valve 3", ["doc1#chunk0"], "context", True)
     assert "needs human check" in out.lower()
     # with citation -> no guard append
-    out2 = hallucination_guard("Pressure high — check valve 3 [doc:doc1#chunk0]", ["doc1#chunk0"], "context", True)
+    out2 = hallucination_guard(
+        "Pressure high — check valve 3 [doc:doc1#chunk0]", ["doc1#chunk0"], "context", True
+    )
     assert "needs human check" not in out2.lower() or "[doc:" in out2
     # ungrounded but no numbers -> still flagged
-    out3 = hallucination_guard("You should replace bearing immediately", ["doc1#chunk0"], "context", True)
+    out3 = hallucination_guard(
+        "You should replace bearing immediately", ["doc1#chunk0"], "context", True
+    )
     assert "human check" in out3.lower() or "[doc:" in out3
 
 
@@ -56,13 +68,17 @@ async def test_hallucination_guard_integration_no_rag():
     """When RAG empty, /ask must defer with needs human check, not hallucinate."""
     from fastapi.testclient import TestClient
     from reasoning_copilot.api.main import app
-    from reasoning_copilot.rag.store import RagStore as Store
+
     # Use a fresh store: clear then ask nonsense
     with TestClient(app) as client:
         # hit correlate with empty-ish query that yields no citations -> should still not hallucinate numbers
         resp = client.post(
             "/ask",
-            json={"question": "What is the exact pressure reading at line 99 gauge Z at 3:14am?", "plant_id": "plant-demo-01", "top_k": 1},
+            json={
+                "question": "What is the exact pressure reading at line 99 gauge Z at 3:14am?",
+                "plant_id": "plant-demo-01",
+                "top_k": 1,
+            },
         )
         assert resp.status_code == 200
         ans = resp.json()["answer"]

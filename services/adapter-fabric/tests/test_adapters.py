@@ -1,4 +1,5 @@
 """Adapter tests — Modbus register decode, MTConnect XML, MQTT inject, OPC-UA/metrics."""
+
 import pytest
 import struct
 
@@ -7,7 +8,13 @@ from adapter_fabric.adapters.modbus.adapter import _decode_registers  # type: ig
 from adapter_fabric.adapters.mtconnect.adapter import parse_mtconnect_xml, MTConnectAdapter
 from adapter_fabric.adapters.mqtt.adapter import MqttAdapter
 from adapter_fabric.adapters.opcua.adapter import OpcUaAdapter
-from adapter_fabric.adapters.ethernet_ip.adapter import EthernetIpAdapter, build_eip_header, parse_eip_header, build_cip_read_tag_request, build_send_rr_data
+from adapter_fabric.adapters.ethernet_ip.adapter import (
+    EthernetIpAdapter,
+    build_eip_header,
+    parse_eip_header,
+    build_cip_read_tag_request,
+    build_send_rr_data,
+)
 
 
 # --- Modbus register decode ---
@@ -86,7 +93,11 @@ async def test_mtconnect_xml_tag_mapping():
         adapter_id="mtc-2",
         protocol=Protocol.MTCONNECT,
         station_id="s1",
-        tags=(TagMapping(source_tag="spindle_speed", metric="spindle_speed", unit="rpm", scale=1, offset=0),),
+        tags=(
+            TagMapping(
+                source_tag="spindle_speed", metric="spindle_speed", unit="rpm", scale=1, offset=0
+            ),
+        ),
         params={},  # no base_url -> synthetic
         poll_interval_ms=0,
     )
@@ -103,7 +114,13 @@ async def test_mqtt_inject_and_poll():
         protocol=Protocol.MQTT,
         station_id="line2-sensor01",
         tags=(
-            TagMapping(source_tag="factory/line2/pressure", metric="pressure_bar", unit="bar", scale=0.1, offset=0),
+            TagMapping(
+                source_tag="factory/line2/pressure",
+                metric="pressure_bar",
+                unit="bar",
+                scale=0.1,
+                offset=0,
+            ),
         ),
         params={"host": "localhost", "json_path": "value"},
         poll_interval_ms=0,
@@ -143,7 +160,11 @@ async def test_opcua_synthetic():
         adapter_id="opcua-1",
         protocol=Protocol.OPCUA,
         station_id="line1-opc01",
-        tags=(TagMapping(source_tag="ns=2;i=1001", metric="pressure_bar", unit="bar", scale=1, offset=0),),
+        tags=(
+            TagMapping(
+                source_tag="ns=2;i=1001", metric="pressure_bar", unit="bar", scale=1, offset=0
+            ),
+        ),
         params={"endpoint": "opc.tcp://127.0.0.1:4840", "timeout_s": 0.5},
         poll_interval_ms=0,
     )

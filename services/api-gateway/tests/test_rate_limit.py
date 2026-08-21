@@ -1,4 +1,5 @@
 """Tests — Redis rate limit (in-memory fallback, so no Redis needed)."""
+
 import pytest
 import asyncio
 
@@ -18,6 +19,7 @@ async def test_in_memory_bucket_allows_until_limit():
     assert allowed is False
     assert remaining == 0
 
+
 @pytest.mark.asyncio
 async def test_in_memory_bucket_resets_after_window():
     bucket = _InMemoryBucket()
@@ -32,6 +34,7 @@ async def test_in_memory_bucket_resets_after_window():
     assert allowed is True
     assert remaining == 2
 
+
 @pytest.mark.asyncio
 async def test_in_memory_isolated_keys():
     bucket = _InMemoryBucket()
@@ -40,6 +43,7 @@ async def test_in_memory_isolated_keys():
     assert allowed is True  # b not affected
     allowed, _ = await bucket.is_allowed("a", max_hits=1, window_s=60)
     assert allowed is False
+
 
 @pytest.mark.asyncio
 async def test_rate_limiter_fallback_without_redis():
@@ -54,6 +58,7 @@ async def test_rate_limiter_fallback_without_redis():
     assert allowed is False
     assert remaining == 0
     await rl.close()
+
 
 @pytest.mark.asyncio
 async def test_rate_limiter_reset():

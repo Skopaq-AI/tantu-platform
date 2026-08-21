@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 from scipy.signal import find_peaks, get_window
@@ -82,13 +82,17 @@ def analyze_vibration(
     spec = np.fft.rfft(xw)
     freqs = np.fft.rfftfreq(n, d=1.0 / sample_rate_hz)
     # magnitude, window-corrected, scaled to amplitude (not power)
-    mag = np.abs(spec) / (n * cg * 0.5)  # 0.5 because one-sided doubles energy; close enough for peaks
+    mag = np.abs(spec) / (
+        n * cg * 0.5
+    )  # 0.5 because one-sided doubles energy; close enough for peaks
     mag[0] = 0.0  # ignore DC after detrend
 
     # spectral floor for prominence threshold
     # prominence in linear; convert db to linear factor
     floor = float(np.median(mag[1:])) if mag.size > 2 else 0.0
-    prom_lin = floor * (10.0 ** (min_peak_prom_db / 20.0)) if floor > 1e-12 else float(np.max(mag) * 0.08)
+    prom_lin = (
+        floor * (10.0 ** (min_peak_prom_db / 20.0)) if floor > 1e-12 else float(np.max(mag) * 0.08)
+    )
 
     # find peaks
     peaks_idx, props = find_peaks(mag, prominence=prom_lin, distance=max(2, int(len(freqs) / 400)))
@@ -98,7 +102,9 @@ def analyze_vibration(
     if peaks_idx.size > 0:
         order = np.argsort(mag[peaks_idx])[::-1]
         peaks_idx = peaks_idx[order]
-        prominences = prominences[order] if prominences.size else np.zeros_like(peaks_idx, dtype=float)
+        prominences = (
+            prominences[order] if prominences.size else np.zeros_like(peaks_idx, dtype=float)
+        )
         if top_n is not None:
             peaks_idx = peaks_idx[:top_n]
             prominences = prominences[:top_n]

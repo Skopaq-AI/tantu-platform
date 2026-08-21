@@ -107,7 +107,9 @@ class StoreForward:
         try:
             import redis.asyncio as aioredis  # type: ignore
 
-            self._redis = aioredis.from_url(self.redis_url, decode_responses=True, socket_connect_timeout=1.5)
+            self._redis = aioredis.from_url(
+                self.redis_url, decode_responses=True, socket_connect_timeout=1.5
+            )
             await self._redis.ping()
             self._redis_ok = True
         except Exception:
@@ -138,7 +140,10 @@ class StoreForward:
             try:
                 assert self._redis is not None
                 # Redis streams: field values must be strings
-                flat = {k: (json.dumps(v) if isinstance(v, (dict, list)) else str(v)) for k, v in payload.items()}
+                flat = {
+                    k: (json.dumps(v) if isinstance(v, (dict, list)) else str(v))
+                    for k, v in payload.items()
+                }
                 msg_id = await self._redis.xadd(s, flat)  # type: ignore[attr-defined]
                 self.enqueued_total += 1
                 return {"stored": "redis", "id": msg_id, "buffered": len(self.buffer)}
@@ -149,7 +154,11 @@ class StoreForward:
         # buffer fallback
         self.buffer.push(Queued(stream=s, payload=payload, ts=time.time()))
         self.enqueued_total += 1
-        return {"stored": "buffer", "id": f"buf-{self.enqueued_total}", "buffered": len(self.buffer)}
+        return {
+            "stored": "buffer",
+            "id": f"buf-{self.enqueued_total}",
+            "buffered": len(self.buffer),
+        }
 
     async def _drain_loop(self) -> None:
         while self._running:
@@ -173,7 +182,10 @@ class StoreForward:
         for item in batch:
             try:
                 assert self._redis is not None
-                flat = {k: (json.dumps(v) if isinstance(v, (dict, list)) else str(v)) for k, v in item.payload.items()}
+                flat = {
+                    k: (json.dumps(v) if isinstance(v, (dict, list)) else str(v))
+                    for k, v in item.payload.items()
+                }
                 await self._redis.xadd(item.stream, flat)  # type: ignore[attr-defined]
                 drained += 1
                 self.drained_total += 1

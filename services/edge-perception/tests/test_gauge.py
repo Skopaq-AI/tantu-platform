@@ -1,6 +1,5 @@
 """Synthetic gauge images → real CV pipeline, no mocks."""
 
-import base64
 import math
 
 import cv2
@@ -51,13 +50,33 @@ def synth_gauge_image(
     cv2.circle(img, (cx, cy), 5, (200, 200, 200), -1)
 
     # labels
-    cv2.putText(img, f"{cfg.min_value:g}", (cx - r + 18, cy + 6), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 0), 1, cv2.LINE_AA)
-    cv2.putText(img, f"{cfg.max_value:g}", (cx + r - 28, cy + 6), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 0), 1, cv2.LINE_AA)
+    cv2.putText(
+        img,
+        f"{cfg.min_value:g}",
+        (cx - r + 18, cy + 6),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.45,
+        (0, 0, 0),
+        1,
+        cv2.LINE_AA,
+    )
+    cv2.putText(
+        img,
+        f"{cfg.max_value:g}",
+        (cx + r - 28, cy + 6),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.45,
+        (0, 0, 0),
+        1,
+        cv2.LINE_AA,
+    )
 
     if glare:
         # add bright ellipse glare
         overlay = img.copy()
-        cv2.ellipse(overlay, (cx - r // 3, cy - r // 3), (r // 2, r // 3), -20, 0, 360, (255, 255, 255), -1)
+        cv2.ellipse(
+            overlay, (cx - r // 3, cy - r // 3), (r // 2, r // 3), -20, 0, 360, (255, 255, 255), -1
+        )
         img = cv2.addWeighted(overlay, 0.22, img, 0.78, 0)
 
     if noise > 0:
@@ -74,7 +93,9 @@ def test_gauge_mid_scale_accuracy():
         img, _ = synth_gauge_image(value=val, config=cfg)
         res = read_gauge(img, cfg)
         # tolerance: 6% of span (0.6 bar) for synthetic — tight but real pipeline must pass
-        assert abs(res.value - val) < 0.8, f"value {val} got {res.value:.2f} angle {res.angle_deg:.1f} conf {res.confidence:.2f}"
+        assert abs(res.value - val) < 0.8, (
+            f"value {val} got {res.value:.2f} angle {res.angle_deg:.1f} conf {res.confidence:.2f}"
+        )
         assert res.confidence > 0.30, f"low confidence {res.confidence:.2f} for val {val}"
 
 
@@ -89,7 +110,7 @@ def test_gauge_handles_glare():
     cfg = GaugeConfig()
     img, _ = synth_gauge_image(value=6.0, config=cfg, glare=True, noise=3)
     res = read_gauge(img, cfg)
-    assert abs(res.value - 6.0) < 1.2, f"glare case off by {abs(res.value-6.0):.2f}"
+    assert abs(res.value - 6.0) < 1.2, f"glare case off by {abs(res.value - 6.0):.2f}"
     # adaptive threshold should still produce some confidence
     assert res.confidence > 0.20
 

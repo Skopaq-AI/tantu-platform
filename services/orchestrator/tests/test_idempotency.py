@@ -1,6 +1,6 @@
 """Tests — idempotency + orchestrator service deduplication."""
+
 import pytest
-import uuid
 
 from orchestrator.domain.events import DefectEvent, DefectClass, Track
 from orchestrator.domain.policies import EventWindowPolicy
@@ -40,13 +40,16 @@ async def test_idempotency_store_put_and_get():
 @pytest.mark.asyncio
 async def test_orchestrator_idempotent_ingest_no_escalate():
     policy = EventWindowPolicy(confidence_threshold=0.97, max_size=10, ttl_s=60)
-    svc = OrchestratorService(policy=policy)
+    _svc = OrchestratorService(policy=policy)  # instantiated to warm singleton, not directly used
     # Ensure clean store (global singleton is used by service — we patch by clearing)
     from orchestrator.infra import idempotency as idem_mod
+
     # Replace global store with fresh for isolation
     fresh = IdempotencyStore()
     idem_mod.idempotency_store = fresh
-    svc_dup = OrchestratorService(policy=EventWindowPolicy(confidence_threshold=0.97, max_size=10, ttl_s=60))
+    svc_dup = OrchestratorService(
+        policy=EventWindowPolicy(confidence_threshold=0.97, max_size=10, ttl_s=60)
+    )
     # inject fresh store via monkeypatch of module attr (service reads global at call time)
     # Provide single-fault event — should NOT escalate, and duplicate should be deduped
     ev = _ev(event_id="dup-1", defect="pressure_drift", conf=0.5)
@@ -64,6 +67,7 @@ async def test_orchestrator_idempotent_ingest_no_escalate():
 @pytest.mark.asyncio
 async def test_orchestrator_escalation_and_idempotency():
     from orchestrator.infra import idempotency as idem_mod
+
     fresh = IdempotencyStore()
     idem_mod.idempotency_store = fresh
     policy = EventWindowPolicy(confidence_threshold=0.97, max_size=10, ttl_s=60)

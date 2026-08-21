@@ -31,26 +31,26 @@
     --chart-5: 262 83% 58%;
   }
   .dark {
-    --background: 222.2 84% 4.9%;
+    --background: 222 47% 6%;
     --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
+    --card: 222 47% 8%;
     --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
+    --popover: 222 47% 8%;
     --popover-foreground: 210 40% 98%;
-    --primary: 199 89% 48%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
+    --primary: 199 89% 52%;
+    --primary-foreground: 222 47% 6%;
+    --secondary: 217 32% 17%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
+    --muted: 217 32% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 32% 17%;
     --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 62% 32%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
-    --chart-1: 220 70% 50%;
+    --border: 217 32% 17%;
+    --input: 217 32% 17%;
+    --ring: 199 89% 52%;
+    --chart-1: 199 89% 52%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
@@ -60,7 +60,36 @@
 
 @layer base {
   * { @apply border-border; }
-  body { @apply bg-slate-50 text-foreground antialiased; }
-  /* large touch targets for gloved hands */
+  body { @apply bg-slate-50 text-foreground antialiased overflow-x-hidden; }
+  .dark body { @apply bg-slate-950; }
+  /* 48px min for gloved 85dB */
   .glove-target { @apply min-h-[48px] min-w-[48px]; }
 }
+
+/* glass + modern surfaces (2024-26) */
+@layer components {
+  .glass {
+    @apply bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-slate-800 shadow-[0_8px_32px_rgba(0,0,0,0.06)];
+  }
+  .glass-strong {
+    @apply bg-white/85 dark:bg-slate-900/80 backdrop-blur-2xl border border-white/50 dark:border-slate-700/50 shadow-[0_12px_40px_rgba(0,0,0,0.10)];
+  }
+  .grid-pattern {
+    background-image: radial-gradient(circle at 1px 1px, hsl(var(--border)) 1px, transparent 0);
+    background-size: 24px 24px;
+  }
+}
+
+/* micro-interactions + a11y */
+*:focus-visible { @apply outline-none ring-2 ring-sky-500 ring-offset-2; }
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* scrollbars */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { @apply bg-slate-300 dark:bg-slate-700 rounded-full; }
+::-webkit-scrollbar-track { @apply bg-transparent; }
+
+/* sonner dark */
+[data-sonner-toaster] { z-index: 100 !important; }

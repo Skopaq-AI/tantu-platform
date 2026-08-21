@@ -6,9 +6,9 @@
 - Handles Current (snapshot) and Sample (streams) with sequence windowing
 - Tag map: source_tag = dataItemId (e.g. "x_position", "spindle_speed")
 """
+
 from __future__ import annotations
 
-import asyncio
 import time
 import xml.etree.ElementTree as ET
 from typing import Any, Dict, List, Optional
@@ -48,7 +48,17 @@ def parse_mtconnect_xml(xml_text: str) -> Dict[str, Any]:
     # MTConnect structure: <MTConnectStreams> -> <Streams> -> <DeviceStream> -> <ComponentStream> -> <Samples|Events|Condition> -> items
     for el in root.iter():
         t = _strip_ns(el.tag)
-        if t in ("Header", "MTConnectStreams", "MTConnectDevices", "Streams", "DeviceStream", "ComponentStream", "Samples", "Events", "Condition"):
+        if t in (
+            "Header",
+            "MTConnectStreams",
+            "MTConnectDevices",
+            "Streams",
+            "DeviceStream",
+            "ComponentStream",
+            "Samples",
+            "Events",
+            "Condition",
+        ):
             continue
         # leaf data item: tag name is the type, has dataItemId attribute
         if "dataItemId" in el.attrib:
@@ -58,9 +68,7 @@ def parse_mtconnect_xml(xml_text: str) -> Dict[str, Any]:
             # for Conditions: the element tag itself encodes level
             # e.g. <Fault dataItemId="avail" ...>UNAVAILABLE</Fault> vs <Normal ...>
             category = el.attrib.get("category", "")
-            # Try to infer from parent tag
-            parent_tag = ""
-            # not tracking parent easily; use attribute if present
+            # Try to infer from parent tag (parent tracking not yet implemented)
             entry: Dict[str, Any] = {
                 "value": text,
                 "type": el.attrib.get("type", _strip_ns(el.tag)),
@@ -121,7 +129,9 @@ class MTConnectAdapter(BaseAdapter):
         timeout = float(self.config.params.get("timeout_s", 5.0))
         verify = bool(self.config.params.get("verify_ssl", False))
         headers = self.config.params.get("headers", {})
-        self._client = httpx.AsyncClient(timeout=timeout, verify=verify, headers=headers, follow_redirects=True)
+        self._client = httpx.AsyncClient(
+            timeout=timeout, verify=verify, headers=headers, follow_redirects=True
+        )
 
     async def _on_stop(self) -> None:
         if self._client is not None:
@@ -159,7 +169,14 @@ class MTConnectAdapter(BaseAdapter):
         use_sample = bool(self.config.params.get("use_sample", True))
         text: Optional[str] = None
         if use_sample and self._next_sequence is not None:
-            text = await self._fetch("/sample", params={"from": self._next_sequence, "count": 1000, "path": self.config.params.get("path", "")})
+            text = await self._fetch(
+                "/sample",
+                params={
+                    "from": self._next_sequence,
+                    "count": 1000,
+                    "path": self.config.params.get("path", ""),
+                },
+            )
             if text is None:
                 text = await self._fetch("/current")
         else:
@@ -219,7 +236,9 @@ class MTConnectAdapter(BaseAdapter):
                 if "level" in entry:
                     # map Fault/Warning/Normal to numeric severity
                     level = entry.get("level", "Normal")
-                    num = {"Normal": 0.0, "Warning": 1.0, "Fault": 2.0, "Unavailable": -1.0}.get(level, 0.0)
+                    num = {"Normal": 0.0, "Warning": 1.0, "Fault": 2.0, "Unavailable": -1.0}.get(
+                        level, 0.0
+                    )
                 else:
                     try:
                         num = float(entry.get("value", ""))

@@ -1,8 +1,8 @@
 """Tests — gateway RBAC matrix edge cases."""
-import pytest
 
 from gateway.domain.models import Principal, Resource
 from gateway.domain.policies import evaluate
+
 
 def test_rbac_default_deny():
     p = Principal(sub="u", plant_id="p1", role="operator")
@@ -11,10 +11,12 @@ def test_rbac_default_deny():
     dec = evaluate(p, r)
     assert not dec.allow
 
+
 def test_viewer_read_only():
     p = Principal(sub="v", plant_id="p1", role="viewer")
     assert evaluate(p, Resource("gateway", "/api/v1/events", "read", method="GET")).allow
     assert not evaluate(p, Resource("gateway", "/api/v1/ingest", "post", method="POST")).allow
+
 
 def test_reasoning_requires_admin_or_system():
     for role in ["operator", "viewer", "maintenance"]:
@@ -28,6 +30,7 @@ def test_reasoning_requires_admin_or_system():
         p = Principal(sub="u", plant_id="p1", role=role)
         r = Resource("gateway", "/api/v1/reasoning/correlate", "post", method="POST")
         assert evaluate(p, r).allow
+
 
 def test_plant_id_case_sensitive():
     p = Principal(sub="u", plant_id="Plant-A", role="operator")

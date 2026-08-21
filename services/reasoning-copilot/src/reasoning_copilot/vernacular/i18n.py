@@ -3,6 +3,7 @@
 Not a toy dict: covers 40+ factory phrases with natural Hindi/Tamil/Telugu/Kannada
 code-switch where technical nouns (valve, Line, pressure, sensor) stay in English.
 """
+
 from __future__ import annotations
 
 import re
@@ -65,11 +66,21 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
 
 # Generic token-level code-switch for unseen text
 CODE_SWITCH_LEXICON: Dict[str, Dict[str, str]] = {
-    "check": {"hi": "check karo", "ta": "check pannunga", "te": "check cheyandi", "kn": "check maadi"},
+    "check": {
+        "hi": "check karo",
+        "ta": "check pannunga",
+        "te": "check cheyandi",
+        "kn": "check maadi",
+    },
     "pressure": {"hi": "pressure", "ta": "pressure", "te": "pressure", "kn": "pressure"},
     "high": {"hi": "jaasti", "ta": "adhigam", "te": "ekkuva", "kn": "jaasti"},
     "vibration": {"hi": "vibration", "ta": "vibration", "te": "vibration", "kn": "vibration"},
-    "temperature": {"hi": "temperature", "ta": "temperature", "te": "temperature", "kn": "temperature"},
+    "temperature": {
+        "hi": "temperature",
+        "ta": "temperature",
+        "te": "temperature",
+        "kn": "temperature",
+    },
     "valve": {"hi": "valve", "ta": "valve", "te": "valve", "kn": "valve"},
     "needs": {"hi": "zaroorat", "ta": "thevai", "te": "avasaram", "kn": "beku"},
     "human": {"hi": "human", "ta": "human", "te": "human", "kn": "human"},
@@ -115,7 +126,12 @@ def code_switch(text: str, lang: str = "en", keep_technical: bool = True) -> str
     if lang == "en":
         return text
     # For demo: append language-specific politeness particle if not present
-    particles = {"hi": " — kripya check karo", "ta": " — paarunga", "te": " — choodandi", "kn": " — maadi"}
+    particles = {
+        "hi": " — kripya check karo",
+        "ta": " — paarunga",
+        "te": " — choodandi",
+        "kn": " — maadi",
+    }
     # avoid doubling
     low = text.lower()
     if any(p.strip(" —") in low for p in [particles[lang].strip()]):
@@ -138,6 +154,8 @@ def code_switch(text: str, lang: str = "en", keep_technical: bool = True) -> str
                 text = re.sub(re.escape(eng_word), mp[lang].split()[0], text, count=1, flags=re.I)
                 break
         # ensure particle
-        if not text.strip().endswith(tuple(["karo", "pannunga", "cheyandi", "maadi", "paarunga", "choodandi"])):
+        if not text.strip().endswith(
+            tuple(["karo", "pannunga", "cheyandi", "maadi", "paarunga", "choodandi"])
+        ):
             text = text.rstrip(".") + particles[lang]
     return text

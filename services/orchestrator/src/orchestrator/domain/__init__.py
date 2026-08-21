@@ -1,4 +1,5 @@
 """Domain — pure."""
+
 from .events import (  # noqa: F401
     Track,
     DefectClass,

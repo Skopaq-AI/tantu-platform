@@ -1,4 +1,5 @@
 """TimescaleDB — SQLAlchemy async, hypertable setup."""
+
 from __future__ import annotations
 
 import logging
@@ -6,7 +7,7 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncEngine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import String, Integer, Float, Text, DateTime, func, JSON, Index
+from sqlalchemy import String, Integer, Float, Text, DateTime, func, JSON
 from datetime import datetime
 
 from .config import settings
@@ -28,7 +29,9 @@ class DefectEventRow(Base):
     confidence: Mapped[float] = mapped_column(Float)
     latency_ms: Mapped[float] = mapped_column(Float)
     protocol: Mapped[str] = mapped_column(String(32))
-    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    ts: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
     adapter_id: Mapped[str] = mapped_column(String(64), default="")
 
 
@@ -43,7 +46,9 @@ class CorrelationReportRow(Base):
     tokens_out: Mapped[int] = mapped_column(Integer)
     cost_usd: Mapped[float] = mapped_column(Float)
     window_size: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
 
 
 class IdempotencyRow(Base):
@@ -87,8 +92,17 @@ async def init_db() -> None:
             # Timescale hypertable — ignore if extension not present
             try:
                 from sqlalchemy import text
-                await conn.execute(text("SELECT create_hypertable('defect_events','ts', if_not_exists=>TRUE, migrate_data=>TRUE)"))
-                await conn.execute(text("SELECT create_hypertable('correlation_reports','created_at', if_not_exists=>TRUE, migrate_data=>TRUE)"))
+
+                await conn.execute(
+                    text(
+                        "SELECT create_hypertable('defect_events','ts', if_not_exists=>TRUE, migrate_data=>TRUE)"
+                    )
+                )
+                await conn.execute(
+                    text(
+                        "SELECT create_hypertable('correlation_reports','created_at', if_not_exists=>TRUE, migrate_data=>TRUE)"
+                    )
+                )
             except Exception as e:
                 log.debug("hypertable creation skipped: %s", e)
         log.info("orchestrator db: tables ready")

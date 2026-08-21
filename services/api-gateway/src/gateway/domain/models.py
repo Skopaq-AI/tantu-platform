@@ -1,4 +1,5 @@
 """Domain models — ubiquitous language for gateway."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -8,6 +9,7 @@ from typing import Optional
 @dataclass(frozen=True, slots=True)
 class Principal:
     """Authenticated caller — projection of JWT claims."""
+
     sub: str
     plant_id: str
     role: str
@@ -18,9 +20,10 @@ class Principal:
 @dataclass(frozen=True, slots=True)
 class Resource:
     """Resource being accessed — RBAC + ABAC input."""
+
     service: str  # adapter-fabric | orchestrator | reasoning-copilot | edge-perception | gateway
-    path: str     # /api/v1/events, /health, etc.
-    action: str   # read | write | post | delete | health | *
+    path: str  # /api/v1/events, /health, etc.
+    action: str  # read | write | post | delete | health | *
     plant_id: Optional[str] = None  # ABAC attribute — must equal principal.plant_id unless wildcard
     method: str = "GET"
 

@@ -1,4 +1,5 @@
 """Domain events — pure, no I/O. No image field by construction."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

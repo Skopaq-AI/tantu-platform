@@ -66,7 +66,9 @@ def test_crest_and_kurtosis_bump_on_impulse():
         imp[k] += 4.0
     res_clean = analyze_vibration(base, 1000.0)
     res_imp = analyze_vibration(imp, 1000.0)
-    assert res_imp.kurtosis > res_clean.kurtosis + 0.6, f"kurt clean {res_clean.kurtosis:.2f} imp {res_imp.kurtosis:.2f}"
+    assert res_imp.kurtosis > res_clean.kurtosis + 0.6, (
+        f"kurt clean {res_clean.kurtosis:.2f} imp {res_imp.kurtosis:.2f}"
+    )
     assert res_imp.crest_factor > res_clean.crest_factor
 
 
@@ -78,7 +80,6 @@ def test_empty_raises():
 
 
 def test_latency_under_budget():
-    import time
     x = synth_vib(freqs=[(50, 1.0), (100, 0.5)], noise_std=0.05)
     res = analyze_vibration(x, 2000.0)
     assert res.latency_ms < 80, f"fft latency {res.latency_ms:.1f}ms"

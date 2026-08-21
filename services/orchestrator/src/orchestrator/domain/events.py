@@ -1,4 +1,5 @@
 """Domain events — ubiquitous language. Pure, no I/O. No image field by construction."""
+
 from __future__ import annotations
 
 import uuid

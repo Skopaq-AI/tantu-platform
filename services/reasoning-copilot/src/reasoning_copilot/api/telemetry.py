@@ -1,4 +1,5 @@
 """OpenTelemetry — FastAPI instrumentation + OTLP export."""
+
 from __future__ import annotations
 
 import logging
@@ -16,7 +17,9 @@ def init_telemetry(app, service_name: str = "reasoning-copilot"):
 
         from ..config import settings
 
-        resource = Resource.create({"service.name": service_name, "service.version": settings.service_version})
+        resource = Resource.create(
+            {"service.name": service_name, "service.version": settings.service_version}
+        )
         provider = TracerProvider(resource=resource)
         trace.set_tracer_provider(provider)
 

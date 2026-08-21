@@ -1,19 +1,19 @@
 """Gateway FastAPI app — CORS + Helmet + rate limit + JWT RS256 + RBAC/ABAC + proxy + audit."""
+
 from __future__ import annotations
 
 import time
 import logging
-import uuid
 from contextlib import asynccontextmanager
 from typing import Optional, Any
 
-from fastapi import FastAPI, Request, Response, Depends, Header, HTTPException, status
+from fastapi import FastAPI, Request, Response, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from ..infra.config import settings
-from ..infra.security import require_auth, optional_auth, verify_jwt, issue_jwt
+from ..infra.security import require_auth, verify_jwt, issue_jwt
 from ..infra.rate_limit import rate_limiter
 from ..infra.downstream import downstream_client
 from ..infra.db import init_db, close_db
@@ -61,6 +61,7 @@ app.add_middleware(
     expose_headers=["X-Request-Id", "X-RateLimit-Remaining", "X-RateLimit-Reset"],
 )
 
+
 # ── Helmet middleware ─────────────────────────────────────────────────
 @app.middleware("http")
 async def helmet_middleware(request: Request, call_next):
@@ -76,8 +77,11 @@ async def helmet_middleware(request: Request, call_next):
     # Remove server fingerprint
     if "server" in response.headers:
         del response.headers["server"]
-    response.headers["X-Request-Id"] = request.headers.get("x-request-id", getattr(request.state, "request_id", ""))
+    response.headers["X-Request-Id"] = request.headers.get(
+        "x-request-id", getattr(request.state, "request_id", "")
+    )
     return response
+
 
 # ── Request ID + audit middleware ─────────────────────────────────────
 @app.middleware("http")
@@ -118,6 +122,7 @@ async def audit_middleware(request: Request, call_next):
         # Fire and forget audit (do not block)
         try:
             from ..domain.models import AuditEntry
+
             entry = AuditEntry(
                 request_id=request_id,
                 principal=principal_str,
@@ -131,6 +136,7 @@ async def audit_middleware(request: Request, call_next):
             )
             # schedule without awaiting to not delay response — but for correctness we await with timeout
             import asyncio
+
             asyncio.create_task(write_audit(entry))
         except Exception:
             pass
@@ -140,6 +146,7 @@ async def audit_middleware(request: Request, call_next):
         log.exception("gateway unhandled: %s %s %s", request.method, request.url.path, e)
         try:
             from ..domain.models import AuditEntry
+
             entry = AuditEntry(
                 request_id=request_id,
                 principal=principal_str,
@@ -152,13 +159,17 @@ async def audit_middleware(request: Request, call_next):
                 reason=str(e)[:200],
             )
             import asyncio
+
             asyncio.create_task(write_audit(entry))
         except Exception:
             pass
-        return JSONResponse(status_code=500, content={"detail": "internal gateway error", "request_id": request_id})
+        return JSONResponse(
+            status_code=500, content={"detail": "internal gateway error", "request_id": request_id}
+        )
 
 
 # ── Health ────────────────────────────────────────────────────────────
+
 
 @app.get("/health", tags=["ops"], summary="Aggregated health (self + downstream)")
 async def health():
@@ -178,7 +189,9 @@ async def ready():
     # Probe Redis
     redis_status = "unknown"
     try:
-        allowed, remaining, ttl = await rate_limiter.is_allowed("_probe", max_hits=1000, window_s=60)
+        allowed, remaining, ttl = await rate_limiter.is_allowed(
+            "_probe", max_hits=1000, window_s=60
+        )
         redis_status = "ok"
         # rollback probe increment by resetting?
         # we used _probe key; reset to not pollute
@@ -190,6 +203,7 @@ async def ready():
     try:
         from sqlalchemy import text as _text
         from ..infra.db import get_engine
+
         eng = get_engine()
         async with eng.connect() as conn:
             await conn.execute(_text("SELECT 1"))
@@ -204,6 +218,7 @@ async def ready():
 
 
 # ── Auth — dev token issuance ───────────────────────────────────────
+
 
 class TokenRequest(BaseModel):
     sub: str
@@ -224,13 +239,23 @@ async def auth_token(body: TokenRequest):
 
 @app.get("/auth/me", tags=["auth"], summary="Inspect current principal")
 async def auth_me(claims: dict = Depends(require_auth)):
-    return {"sub": claims.get("sub"), "plant_id": claims.get("plant_id"), "role": claims.get("role"), "claims": claims}
+    return {
+        "sub": claims.get("sub"),
+        "plant_id": claims.get("plant_id"),
+        "role": claims.get("role"),
+        "claims": claims,
+    }
 
 
 # ── Helpers — RBAC/ABAC guard ───────────────────────────────────────
 
+
 def _claims_to_principal(claims: dict) -> Principal:
-    extra = {k: v for k, v in claims.items() if k not in ("sub", "plant_id", "role", "exp", "iat", "iss", "aud", "jti", "scopes")}
+    extra = {
+        k: v
+        for k, v in claims.items()
+        if k not in ("sub", "plant_id", "role", "exp", "iat", "iss", "aud", "jti", "scopes")
+    }
     scopes = tuple(claims.get("scopes", [])) if isinstance(claims.get("scopes"), list) else ()
     return Principal(
         sub=str(claims.get("sub", "")),
@@ -239,6 +264,7 @@ def _claims_to_principal(claims: dict) -> Principal:
         scopes=scopes,
         extra=extra,
     )
+
 
 def _extract_plant_id(request: Request, claims: dict) -> Optional[str]:
     """ABAC plant scope extraction — header, query, or body field, else claims plant_id for writes."""
@@ -266,7 +292,11 @@ async def enforce_policy(
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"Rate limit exceeded ({settings.rate_limit_per_minute}/min). Retry after {reset}s",
-            headers={"Retry-After": str(reset), "X-RateLimit-Remaining": "0", "X-RateLimit-Reset": str(reset)},
+            headers={
+                "Retry-After": str(reset),
+                "X-RateLimit-Remaining": "0",
+                "X-RateLimit-Reset": str(reset),
+            },
         )
     # RBAC + ABAC
     principal = _claims_to_principal(claims)
@@ -290,13 +320,19 @@ async def enforce_policy(
     request.state.rate_reset = reset
     return claims
 
+
 # Lighter guard for probes that need auth but skip rate for health? Rate still applied.
 # Expose a dependency that skips rate for tests: not needed.
 
 # ── Proxy routes ──────────────────────────────────────────────────────
 # We expose an authenticated catch-all for /api/* that enforces policy then proxies.
 
-@app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"], tags=["proxy"])
+
+@app.api_route(
+    "/api/{path:path}",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
+    tags=["proxy"],
+)
 async def proxy_api(path: str, request: Request, claims: dict = Depends(enforce_policy)):
     full_path = f"/api/{path}"
     downstream_base = resolve_downstream(full_path)
@@ -326,6 +362,7 @@ async def proxy_api(path: str, request: Request, claims: dict = Depends(enforce_
         resp.headers["X-RateLimit-Remaining"] = str(request.state.rate_remaining)
         resp.headers["X-RateLimit-Reset"] = str(request.state.rate_reset)
     return resp
+
 
 # Convenience: explicit ingest/events proxies with same guard but more specific OpenAPI
 # These are covered by the catch-all above, but we keep them for docs.

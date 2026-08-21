@@ -1,4 +1,5 @@
 """Adapter base — lifecycle, health, queue."""
+
 from __future__ import annotations
 
 import abc
@@ -31,7 +32,11 @@ class BaseAdapter(abc.ABC):
 
     @property
     def protocol(self) -> str:
-        return self.config.protocol.value if hasattr(self.config.protocol, "value") else str(self.config.protocol)
+        return (
+            self.config.protocol.value
+            if hasattr(self.config.protocol, "value")
+            else str(self.config.protocol)
+        )
 
     # --- lifecycle ---
     async def start(self) -> None:
@@ -86,7 +91,9 @@ class BaseAdapter(abc.ABC):
             readings = await self._poll_once_impl()
             for r in readings:
                 try:
-                    m.READINGS_TOTAL.labels(protocol=self.protocol, adapter_id=self.adapter_id, metric=r.metric).inc()
+                    m.READINGS_TOTAL.labels(
+                        protocol=self.protocol, adapter_id=self.adapter_id, metric=r.metric
+                    ).inc()
                 except Exception:
                     pass
             self._message_count += len(readings)
@@ -120,7 +127,9 @@ class BaseAdapter(abc.ABC):
             raise
         finally:
             try:
-                m.POLL_LATENCY.labels(protocol=self.protocol, adapter_id=self.adapter_id).observe(time.monotonic() - start)
+                m.POLL_LATENCY.labels(protocol=self.protocol, adapter_id=self.adapter_id).observe(
+                    time.monotonic() - start
+                )
             except Exception:
                 pass
 
@@ -132,8 +141,7 @@ class BaseAdapter(abc.ABC):
         return None
 
     @abc.abstractmethod
-    async def _poll_once_impl(self) -> List[NormalizedReading]:
-        ...
+    async def _poll_once_impl(self) -> List[NormalizedReading]: ...
 
     # poll loop
     async def _poll_loop(self) -> None:

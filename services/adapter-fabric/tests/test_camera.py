@@ -1,6 +1,6 @@
 """Camera gauge detection tests — synthetic image round-trip."""
+
 import pytest
-import numpy as np
 
 from adapter_fabric.adapters.camera.adapter import (
     GaugeCalibration,
@@ -23,8 +23,6 @@ def test_generate_and_analyze_gauge():
     cal = GaugeCalibration(min_angle=-135, max_angle=135, min_value=0, max_value=100)
     # generate synthetic gauge at 75
     try:
-        import cv2  # type: ignore
-
         has_cv2 = True
     except Exception:
         has_cv2 = False
@@ -36,13 +34,14 @@ def test_generate_and_analyze_gauge():
     value, conf, angle, debug = analyze_gauge_image(img, cal)
     assert value is not None, f"detection failed: {debug}"
     # Allow +-8 tolerance due to Hough quantization and pixel aliasing
-    assert value == pytest.approx(75, abs=8.0), f"got {value} conf {conf} angle {angle} debug {debug}"
+    assert value == pytest.approx(75, abs=8.0), (
+        f"got {value} conf {conf} angle {angle} debug {debug}"
+    )
     assert conf > 0.4
 
 
 def test_generate_multiple_values():
     try:
-        import cv2
         has_cv2 = True
     except Exception:
         has_cv2 = False
@@ -69,8 +68,6 @@ async def test_camera_adapter_inject():
     )
     ad = CameraAdapter(cfg)
     try:
-        import cv2
-
         has_cv2 = True
     except Exception:
         has_cv2 = False

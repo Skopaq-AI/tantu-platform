@@ -1,9 +1,15 @@
 """Domain tests — tag_map, events, models."""
+
 import pytest
 
-from adapter_fabric.domain.events import DefectEvent, Track, DefectClass, NormalizedReading, Quality
+from adapter_fabric.domain.events import DefectEvent, NormalizedReading, Quality
 from adapter_fabric.domain.models import TagMapping
-from adapter_fabric.domain.tag_map import apply_tag_mapping, compound, normalize_raw_value, evaluate_compound_formula
+from adapter_fabric.domain.tag_map import (
+    apply_tag_mapping,
+    compound,
+    normalize_raw_value,
+    evaluate_compound_formula,
+)
 
 
 def test_defect_event_has_no_image_field():
@@ -21,19 +27,35 @@ def test_defect_event_has_no_image_field():
 
 
 def test_normalized_reading_schema():
-    r = NormalizedReading(station_id="s1", metric="pressure_bar", value=5.1, unit="bar", protocol="opcua", adapter_id="opcua-1", source_tag="ns=2;i=1001")
+    r = NormalizedReading(
+        station_id="s1",
+        metric="pressure_bar",
+        value=5.1,
+        unit="bar",
+        protocol="opcua",
+        adapter_id="opcua-1",
+        source_tag="ns=2;i=1001",
+    )
     assert r.metric == "pressure_bar"
     assert r.quality == Quality.GOOD
 
 
 def test_scale_offset():
-    tm = TagMapping(source_tag="ns=2;i=1001", metric="pressure_bar", unit="bar", scale=0.1, offset=1.0)
+    tm = TagMapping(
+        source_tag="ns=2;i=1001", metric="pressure_bar", unit="bar", scale=0.1, offset=1.0
+    )
     assert apply_tag_mapping(100, tm) == pytest.approx(11.0)
     assert apply_tag_mapping(0, tm) == pytest.approx(1.0)
 
 
 def test_compound_formula():
-    tm = TagMapping(source_tag="compound", metric="pressure_avg", unit="bar", compound_formula="(a + b) / 2", source_tags={"a": "ns=2;i=1", "b": "ns=2;i=2"})
+    tm = TagMapping(
+        source_tag="compound",
+        metric="pressure_avg",
+        unit="bar",
+        compound_formula="(a + b) / 2",
+        source_tags={"a": "ns=2;i=1", "b": "ns=2;i=2"},
+    )
     v = compound({"a": 10, "b": 20}, tm)
     assert v == pytest.approx(15.0)
 

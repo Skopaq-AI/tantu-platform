@@ -4,6 +4,7 @@ Rule (from spec): escalate if (fault_count >= 2) OR (any confidence >= 0.97)
 
 fault_count = events where defect_class != "none" within the window.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -48,7 +49,7 @@ class EventWindowPolicy:
         self._windows[plant_id] = [(e, ts) for e, ts in lst if (now - ts) <= self.ttl_s]
         # bound size — keep most recent max_size
         if len(self._windows[plant_id]) > self.max_size:
-            self._windows[plant_id] = self._windows[plant_id][-self.max_size:]
+            self._windows[plant_id] = self._windows[plant_id][-self.max_size :]
 
     def ingest(self, event: DefectEvent, now: Optional[float] = None) -> None:
         """Add event to window. Non-fault events (NONE) are still tracked for confidence check."""
@@ -62,7 +63,7 @@ class EventWindowPolicy:
         self._windows[pid].append((event, now))
         # prune again after append for size
         if len(self._windows[pid]) > self.max_size:
-            self._windows[pid] = self._windows[pid][-self.max_size:]
+            self._windows[pid] = self._windows[pid][-self.max_size :]
 
     def events_for(self, plant_id: str, now: Optional[float] = None) -> list[DefectEvent]:
         self._prune_expired(plant_id, now)

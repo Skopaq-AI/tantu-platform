@@ -1,9 +1,9 @@
 """Persistence — TimescaleDB via SQLAlchemy async, with graceful degradation."""
+
 from __future__ import annotations
 
 import logging
 from typing import Optional, List
-from datetime import datetime, timezone
 
 from sqlalchemy import select, desc
 from sqlalchemy.exc import IntegrityError
@@ -70,7 +70,11 @@ async def list_reports(limit: int = 50, plant_id: Optional[str] = None) -> List[
     try:
         Session = get_sessionmaker()
         async with Session() as session:
-            q = select(CorrelationReportRow).order_by(desc(CorrelationReportRow.created_at)).limit(limit)
+            q = (
+                select(CorrelationReportRow)
+                .order_by(desc(CorrelationReportRow.created_at))
+                .limit(limit)
+            )
             if plant_id:
                 q = q.where(CorrelationReportRow.plant_id == plant_id)
             res = await session.execute(q)

@@ -1,9 +1,10 @@
 """Tag-map compounding — pure, testable, no I/O."""
+
 from __future__ import annotations
 
 import ast
 import math
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from .models import TagMapping
 
@@ -84,7 +85,9 @@ def compound(raw_by_var: Dict[str, float], mapping: TagMapping) -> float:
             v = next(iter(raw_by_var.values()))
             return apply_tag_mapping(v, mapping)
         # multi but no formula: average scaled
-        return sum(apply_tag_mapping(v, mapping) for v in raw_by_var.values()) / max(1, len(raw_by_var))
+        return sum(apply_tag_mapping(v, mapping) for v in raw_by_var.values()) / max(
+            1, len(raw_by_var)
+        )
     return _safe_eval(mapping.compound_formula, raw_by_var)
 
 

@@ -107,7 +107,7 @@ Accounts (seeded, JWT): `operator/operator123` (ta), `maintenance/maint123` (en)
 
 ### 1. One-time — Connect GitHub to GCP (OIDC, no JSON keys)
 
-In GCP console (project `tantu-beta` or `shiksha-os-dev-skopaq`, region `asia-south1`):
+In GCP console (project `tantu-beta-20260821-01` (dedicated beta project), region `asia-south1`):
 
 ```bash
 # variables

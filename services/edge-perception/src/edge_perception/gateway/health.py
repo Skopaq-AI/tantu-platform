@@ -23,28 +23,41 @@ class HealthAggregator:
     def set(self, comp: ComponentHealth) -> None:
         self._components[comp.name] = comp
 
-    def mark_ok(self, name: str, latency_ms: float | None = None, details: dict | None = None) -> None:
+    def mark_ok(
+        self, name: str, latency_ms: float | None = None, details: dict | None = None
+    ) -> None:
         now = time.time()
         prev = self._components.get(name)
         self._components[name] = ComponentHealth(
-            name=name, status="ok", latency_ms=latency_ms, last_ok_ts=now,
-            last_error=None if (prev and prev.status != "down") else (prev.last_error if prev else None),
+            name=name,
+            status="ok",
+            latency_ms=latency_ms,
+            last_ok_ts=now,
+            last_error=None
+            if (prev and prev.status != "down")
+            else (prev.last_error if prev else None),
             details=details or {},
         )
 
     def mark_degraded(self, name: str, reason: str) -> None:
         prev = self._components.get(name)
         self._components[name] = ComponentHealth(
-            name=name, status="degraded", latency_ms=prev.latency_ms if prev else None,
-            last_ok_ts=prev.last_ok_ts if prev else None, last_error=reason,
+            name=name,
+            status="degraded",
+            latency_ms=prev.latency_ms if prev else None,
+            last_ok_ts=prev.last_ok_ts if prev else None,
+            last_error=reason,
             details=prev.details if prev else {},
         )
 
     def mark_down(self, name: str, reason: str) -> None:
         prev = self._components.get(name)
         self._components[name] = ComponentHealth(
-            name=name, status="down", latency_ms=None,
-            last_ok_ts=prev.last_ok_ts if prev else None, last_error=reason,
+            name=name,
+            status="down",
+            latency_ms=None,
+            last_ok_ts=prev.last_ok_ts if prev else None,
+            last_error=reason,
             details=prev.details if prev else {},
         )
 

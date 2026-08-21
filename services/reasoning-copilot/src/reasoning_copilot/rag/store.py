@@ -5,6 +5,7 @@ Fallback: in-memory dict with Embedder cosine search (no server needed for tests
 
 Documents are chunked before embedding. Each chunk is a point with payload {text, metadata}.
 """
+
 from __future__ import annotations
 
 import logging
@@ -71,7 +72,12 @@ class RagStore:
                     collection_name=self.collection,
                     vectors_config=VectorParams(size=self.embedder.dim, distance=Distance.COSINE),
                 )
-                log.info("RagStore: created Qdrant collection %s dim=%s at %s", self.collection, self.embedder.dim, url)
+                log.info(
+                    "RagStore: created Qdrant collection %s dim=%s at %s",
+                    self.collection,
+                    self.embedder.dim,
+                    url,
+                )
             else:
                 log.info("RagStore: using Qdrant collection %s at %s", self.collection, url)
             self._use_qdrant = True
@@ -84,7 +90,13 @@ class RagStore:
 
     def add(self, doc: Document) -> int:
         """Add doc chunked + embedded. Returns chunk count."""
-        chunks = chunk_document(doc.id, doc.text, doc.metadata, chunk_size=settings.chunk_size, overlap=settings.chunk_overlap)
+        chunks = chunk_document(
+            doc.id,
+            doc.text,
+            doc.metadata,
+            chunk_size=settings.chunk_size,
+            overlap=settings.chunk_overlap,
+        )
         if not chunks:
             return 0
         texts = [c["text"] for c in chunks]
@@ -101,7 +113,12 @@ class RagStore:
                         PointStruct(
                             id=pid,
                             vector=vec.tolist(),
-                            payload={"doc_id": ch["id"], "parent_id": doc.id, "text": ch["text"], "metadata": ch["metadata"]},
+                            payload={
+                                "doc_id": ch["id"],
+                                "parent_id": doc.id,
+                                "text": ch["text"],
+                                "metadata": ch["metadata"],
+                            },
                         )
                     )
                 self._client.upsert(collection_name=self.collection, points=points)
@@ -113,7 +130,14 @@ class RagStore:
         # in-memory
         for ch, vec in zip(chunks, vecs):
             self._mem_points.append(
-                {"id": ch["id"], "doc_id": ch["id"], "parent_id": doc.id, "text": ch["text"], "metadata": ch["metadata"], "vector": vec}
+                {
+                    "id": ch["id"],
+                    "doc_id": ch["id"],
+                    "parent_id": doc.id,
+                    "text": ch["text"],
+                    "metadata": ch["metadata"],
+                    "vector": vec,
+                }
             )
         return len(chunks)
 
@@ -191,12 +215,13 @@ class RagStore:
     def clear(self):
         if self._use_qdrant and self._client is not None:
             try:
-                from qdrant_client.models import Filter  # type: ignore
                 self._client.delete_collection(self.collection)
                 # recreate
                 from qdrant_client.models import Distance, VectorParams  # type: ignore
+
                 self._client.create_collection(
-                    collection_name=self.collection, vectors_config=VectorParams(size=self.embedder.dim, distance=Distance.COSINE)
+                    collection_name=self.collection,
+                    vectors_config=VectorParams(size=self.embedder.dim, distance=Distance.COSINE),
                 )
             except Exception:
                 pass

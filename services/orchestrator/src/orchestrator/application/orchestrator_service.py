@@ -1,8 +1,8 @@
 """Application — orchestrator service: window → policy → reasoning → persistence → idempotency."""
+
 from __future__ import annotations
 
 import logging
-import time
 from typing import Optional, List
 
 from ..domain.events import DefectEvent, CorrelationReport
@@ -70,7 +70,7 @@ class OrchestratorService:
         # Idempotency for report — ensure we don't double-correlate same window
         # Use deterministic key: plant + sorted event_ids
         window_key_sorted = ",".join(sorted(e.event_id for e in window_events))
-        report_key = f"report:{pid}:{hash(window_key_sorted) & 0xffffffff:08x}"
+        report_key = f"report:{pid}:{hash(window_key_sorted) & 0xFFFFFFFF:08x}"
         existing_report = await idempotency_store.get(report_key)
         if existing_report is not None:
             rep_dict = existing_report.get("report")
@@ -111,10 +111,17 @@ class OrchestratorService:
         await idempotency_store.put(report_key, {"escalated": True, "report": report_dict})
         await idempotency_store.put(dedupe_key, {"escalated": True, "report": report_dict})
 
-        log.info("orchestrator escalated plant %s with %d events → %s", pid, len(window_events), report.id)
+        log.info(
+            "orchestrator escalated plant %s with %d events → %s",
+            pid,
+            len(window_events),
+            report.id,
+        )
         return True, report
 
-    async def ingest_batch(self, events: List[DefectEvent]) -> List[tuple[bool, Optional[CorrelationReport]]]:
+    async def ingest_batch(
+        self, events: List[DefectEvent]
+    ) -> List[tuple[bool, Optional[CorrelationReport]]]:
         results = []
         for e in events:
             results.append(await self.ingest(e))

@@ -1,4 +1,5 @@
 """Pydantic schemas for API."""
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -19,7 +20,9 @@ class TagMappingIn(BaseModel):
 
 class AdapterConfigIn(BaseModel):
     adapter_id: str = Field(..., pattern=r"^[a-z0-9][a-z0-9\-_]{1,63}$")
-    protocol: str = Field(..., description="opcua | modbus | mqtt | mtconnect | ethernet_ip | camera")
+    protocol: str = Field(
+        ..., description="opcua | modbus | mqtt | mtconnect | ethernet_ip | camera"
+    )
     station_id: str
     enabled: bool = True
     tags: List[TagMappingIn] = Field(default_factory=list)

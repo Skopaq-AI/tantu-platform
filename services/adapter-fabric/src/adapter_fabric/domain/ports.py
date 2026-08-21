@@ -1,10 +1,10 @@
 """Ports — hexagonal boundaries."""
+
 from __future__ import annotations
 
 from typing import AsyncIterator, Protocol, List, Optional
 
 from .events import DefectEvent, NormalizedReading, AdapterHealth
-from .models import AdapterConfig
 
 
 class AdapterPort(Protocol):

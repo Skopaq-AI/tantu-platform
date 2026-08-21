@@ -1,8 +1,8 @@
 """Pipeline — adapter readings → normalized → NATS publish → optional defect event."""
+
 from __future__ import annotations
 
 import asyncio
-from typing import AsyncIterator, Optional
 
 from ..domain.events import NormalizedReading
 from ..infra.nats import NatsPublisher
@@ -41,7 +41,9 @@ class Pipeline:
     async def attach_adapter(self, adapter) -> None:
         """Attach a newly registered adapter without restarting pipeline."""
         if self._running:
-            task = asyncio.create_task(self._consume_adapter(adapter), name=f"pipeline-{adapter.adapter_id}")
+            task = asyncio.create_task(
+                self._consume_adapter(adapter), name=f"pipeline-{adapter.adapter_id}"
+            )
             self._tasks.append(task)
 
     async def _consume_adapter(self, adapter) -> None:
@@ -73,7 +75,9 @@ class Pipeline:
         if ev is not None:
             try:
                 await self.publisher.publish(ev)
-                m.DEFECTS_TOTAL.labels(protocol=reading.protocol, defect_class=ev.defect_class.value).inc()
+                m.DEFECTS_TOTAL.labels(
+                    protocol=reading.protocol, defect_class=ev.defect_class.value
+                ).inc()
             except Exception:
                 pass
 

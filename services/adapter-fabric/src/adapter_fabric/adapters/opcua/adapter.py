@@ -7,6 +7,7 @@ Implements:
  - Subscription path (create_subscription, monitored items)
  - Tag-map normalization via domain.tag_map
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -21,7 +22,7 @@ from ..base import BaseAdapter
 
 try:
     from asyncua import Client, ua  # type: ignore
-    from asyncua.ua import NodeId, VariantType  # type: ignore
+    from asyncua.ua import NodeId  # type: ignore
 
     _HAS_ASYNCUA = True
 except Exception:  # pragma: no cover
@@ -104,7 +105,7 @@ class OpcUaAdapter(BaseAdapter):
                     await self._setup_subscription()
                 return
             except Exception as e:
-                self._last_error = f"OPC-UA connect failed (attempt {attempt+1}): {e}"
+                self._last_error = f"OPC-UA connect failed (attempt {attempt + 1}): {e}"
                 await asyncio.sleep(delay)
                 delay = min(delay * 2, 30.0)
         self._backoff = delay
@@ -256,7 +257,9 @@ class OpcUaAdapter(BaseAdapter):
             )
             # compound
             if tm.source_tags and tm.compound_formula:
-                raw_by_var = {var: float(abs(hash(nid)) % 100) for var, nid in tm.source_tags.items()}
+                raw_by_var = {
+                    var: float(abs(hash(nid)) % 100) for var, nid in tm.source_tags.items()
+                }
                 try:
                     value = compound(raw_by_var, tm)
                     readings.append(

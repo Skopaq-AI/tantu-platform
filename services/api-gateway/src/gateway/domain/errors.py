@@ -1,4 +1,5 @@
 """Domain errors — typed for API translation."""
+
 from __future__ import annotations
 
 

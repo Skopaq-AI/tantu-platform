@@ -7,7 +7,7 @@ echo "=== TANTU Beta GCP Apply ==="
 echo "Project: $PROJECT_ID  Region: $REGION  Env: $ENV"
 echo "Logged as: $(gcloud config get-value account)"
 echo "Creating project $PROJECT_ID (if not exists)..."
-gcloud projects create $PROJECT_ID --name="TANTU Beta" 2>&1 | head -5 || echo "project exists or no perm — using shiksha-os-dev-skopaq"
+gcloud projects create $PROJECT_ID --name="TANTU Beta" 2>&1 | head -5 || echo "project exists or no perm — using current gcloud project"
 if gcloud projects describe $PROJECT_ID 2>&1 | grep -q $PROJECT_ID; then
   gcloud config set project $PROJECT_ID
 else

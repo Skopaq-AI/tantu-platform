@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import time
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Header, HTTPException, status
 from jose import JWTError, jwt
 
 ALG_DEFAULT = "HS256"
@@ -22,7 +22,13 @@ def _secret_and_alg() -> tuple[str, str]:
 def issue_jwt(sub: str, plant_id: str, role: str, exp_min: int = 60) -> str:
     secret, alg = _secret_and_alg()
     now = int(time.time())
-    payload = {"sub": sub, "plant_id": plant_id, "role": role, "exp": now + exp_min * 60, "iat": now}
+    payload = {
+        "sub": sub,
+        "plant_id": plant_id,
+        "role": role,
+        "exp": now + exp_min * 60,
+        "iat": now,
+    }
     return jwt.encode(payload, secret, algorithm=alg)
 
 
@@ -50,13 +56,21 @@ class RBAC:
             # if caller wants auth, they must send it; if not, allow anonymous with limited role
             # To keep secure-by-default, require auth on protected routes via explicit Depends.
             # This callable itself, when used as dependency, REQUIRES a token.
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing bearer token")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="missing bearer token"
+            )
         token = authorization.removeprefix("Bearer ").strip()
         try:
             claims = verify_jwt(token)
         except JWTError as e:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"invalid token: {e}")
-        if self.required_role and claims.get("role") not in (self.required_role, "plant_admin", "admin"):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail=f"invalid token: {e}"
+            )
+        if self.required_role and claims.get("role") not in (
+            self.required_role,
+            "plant_admin",
+            "admin",
+        ):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="insufficient role")
         return claims
 

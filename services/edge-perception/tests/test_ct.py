@@ -6,7 +6,9 @@ import pytest
 from edge_perception.inference.ct_clamp import analyze_ct
 
 
-def synth_current(sample_rate=2000, duration=0.6, fundamental_a=2.0, harmonics=None, mains_hz=50.0, seed=1):
+def synth_current(
+    sample_rate=2000, duration=0.6, fundamental_a=2.0, harmonics=None, mains_hz=50.0, seed=1
+):
     n = int(sample_rate * duration)
     t = np.arange(n) / sample_rate
     x = fundamental_a * np.sqrt(2) * np.sin(2 * np.pi * mains_hz * t)

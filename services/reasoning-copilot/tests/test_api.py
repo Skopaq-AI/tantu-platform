@@ -1,7 +1,6 @@
 """API tests — health, ask, correlate, air_gapped routing, JWT, rate limit, vernacular, costing."""
+
 import pytest
-import time
-import base64
 from fastapi.testclient import TestClient
 
 
@@ -38,7 +37,14 @@ def test_prompts_registry(client):
 
 
 def test_rag_ingest_and_search(client):
-    r = client.post("/rag/ingest", json={"id": "test-doc-api-01", "text": "Test runbook: Line 5 pressure nominal 5 bar, valve 7 controls flow.", "metadata": {"plant_id": "plant-demo-01"}})
+    r = client.post(
+        "/rag/ingest",
+        json={
+            "id": "test-doc-api-01",
+            "text": "Test runbook: Line 5 pressure nominal 5 bar, valve 7 controls flow.",
+            "metadata": {"plant_id": "plant-demo-01"},
+        },
+    )
     assert r.status_code == 200
     assert r.json()["chunks"] >= 1
     r2 = client.post("/rag/search", json={"query": "valve 7 pressure Line 5", "top_k": 2})
@@ -47,7 +53,16 @@ def test_rag_ingest_and_search(client):
 
 
 def test_ask_en(client):
-    r = client.post("/ask", json={"question": "Why is Line 2 pressure high?", "plant_id": "plant-demo-01", "lang": "en", "air_gapped": False, "top_k": 3})
+    r = client.post(
+        "/ask",
+        json={
+            "question": "Why is Line 2 pressure high?",
+            "plant_id": "plant-demo-01",
+            "lang": "en",
+            "air_gapped": False,
+            "top_k": 3,
+        },
+    )
     assert r.status_code == 200, r.text
     j = r.json()
     assert "answer" in j and len(j["answer"]) > 10
@@ -61,7 +76,9 @@ def test_ask_en(client):
 
 
 def test_ask_air_gapped_routes_to_nemotron(client):
-    r = client.post("/ask", json={"question": "Pressure high at Line 2?", "lang": "hi", "air_gapped": True})
+    r = client.post(
+        "/ask", json={"question": "Pressure high at Line 2?", "lang": "hi", "air_gapped": True}
+    )
     assert r.status_code == 200
     j = r.json()
     assert j["air_gapped"] is True
@@ -82,7 +99,14 @@ def test_ask_vernacular_ta(client):
 
 def test_ask_all_langs_code_switch(client):
     for lang in ["hi", "ta", "te", "kn"]:
-        r = client.post("/ask", json={"question": "Line 2 pressure high — check valve?", "lang": lang, "air_gapped": False})
+        r = client.post(
+            "/ask",
+            json={
+                "question": "Line 2 pressure high — check valve?",
+                "lang": lang,
+                "air_gapped": False,
+            },
+        )
         assert r.status_code == 200, f"lang {lang} failed {r.text}"
         assert r.json()["lang"] == lang
         assert len(r.json()["vernacular"]) > 0
@@ -96,8 +120,20 @@ def test_correlate(client):
             "lang": "en",
             "air_gapped": False,
             "events": [
-                {"station_id": "line2-cluster1-gauge3", "track": "line", "defect_class": "pressure_drift", "confidence": 0.88, "protocol": "opcua"},
-                {"station_id": "line2-cluster1-vib2", "track": "line", "defect_class": "vib_high", "confidence": 0.81, "protocol": "modbus"},
+                {
+                    "station_id": "line2-cluster1-gauge3",
+                    "track": "line",
+                    "defect_class": "pressure_drift",
+                    "confidence": 0.88,
+                    "protocol": "opcua",
+                },
+                {
+                    "station_id": "line2-cluster1-vib2",
+                    "track": "line",
+                    "defect_class": "vib_high",
+                    "confidence": 0.81,
+                    "protocol": "modbus",
+                },
             ],
         },
     )
@@ -119,8 +155,16 @@ def test_correlate_air_gapped_kn(client):
             "air_gapped": True,
             "prompt_version": "correlate_v2",
             "events": [
-                {"station_id": "line2-cluster1-gauge3", "defect_class": "pressure_drift", "confidence": 0.92},
-                {"station_id": "line2-cluster1-temp1", "defect_class": "thermal_high", "confidence": 0.76},
+                {
+                    "station_id": "line2-cluster1-gauge3",
+                    "defect_class": "pressure_drift",
+                    "confidence": 0.92,
+                },
+                {
+                    "station_id": "line2-cluster1-temp1",
+                    "defect_class": "thermal_high",
+                    "confidence": 0.76,
+                },
             ],
         },
     )
@@ -163,7 +207,6 @@ def test_rate_limit(client):
         r = client.get("/health")
         assert r.status_code == 200
     # force low limit
-    from reasoning_copilot.api import ratelimit as rl
 
     # monkey: directly call check_rate_limit with small window
     # instead verify that after clear, requests pass
@@ -172,7 +215,9 @@ def test_rate_limit(client):
 
 def test_vernacular_tts_stt_roundtrip(client):
     # TTS
-    r = client.post("/vernacular/tts", json={"text": "Line 2 pressure high — check valve 3", "lang": "hi"})
+    r = client.post(
+        "/vernacular/tts", json={"text": "Line 2 pressure high — check valve 3", "lang": "hi"}
+    )
     assert r.status_code == 200
     j = r.json()
     assert j["lang"] == "hi"
@@ -190,20 +235,37 @@ def test_vernacular_tts_stt_roundtrip(client):
 def test_costing_present_on_all_genai(client):
     for endpoint, payload in [
         ("/ask", {"question": "What is safe pressure?", "lang": "en"}),
-        ("/correlate", {"lang": "en", "events": [{"station_id": "line2-gauge1", "defect_class": "pressure_drift"}]}),
+        (
+            "/correlate",
+            {
+                "lang": "en",
+                "events": [{"station_id": "line2-gauge1", "defect_class": "pressure_drift"}],
+            },
+        ),
     ]:
         r = client.post(endpoint, json=payload)
         assert r.status_code == 200, f"{endpoint} {r.text}"
         j = r.json()
         assert "cost_usd" in j and "tokens_in" in j and "tokens_out" in j
         assert j["tokens_in"] > 0
-        assert j["cost_usd"] == pytest.approx(j["tokens_in"] / 1e6 * 2.0 + j["tokens_out"] / 1e6 * 10.0, rel=0.02)
+        assert j["cost_usd"] == pytest.approx(
+            j["tokens_in"] / 1e6 * 2.0 + j["tokens_out"] / 1e6 * 10.0, rel=0.02
+        )
 
 
 def test_prompt_version_pin(client):
-    r = client.post("/ask", json={"question": "Line 2 pressure?", "lang": "en", "prompt_version": "ask_v2"})
+    r = client.post(
+        "/ask", json={"question": "Line 2 pressure?", "lang": "en", "prompt_version": "ask_v2"}
+    )
     assert r.status_code == 200
     assert r.json()["prompt_version"] == "ask_v2"
-    r2 = client.post("/correlate", json={"lang": "en", "prompt_version": "correlate_v2", "events": [{"station_id": "s1", "defect_class": "pressure_drift"}]})
+    r2 = client.post(
+        "/correlate",
+        json={
+            "lang": "en",
+            "prompt_version": "correlate_v2",
+            "events": [{"station_id": "s1", "defect_class": "pressure_drift"}],
+        },
+    )
     assert r2.status_code == 200
     assert r2.json()["prompt_version"] == "correlate_v2"

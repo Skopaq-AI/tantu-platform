@@ -3,6 +3,7 @@
 Every template is versioned (v1, v2…) and includes grounding + anti-hallucination
 instructions.  The registry is the single source of truth for GENAI calls.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -1,8 +1,9 @@
 """Pydantic models — request/response schemas."""
+
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, List, Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -40,7 +41,9 @@ class DefectEventIn(BaseModel):
 
 
 class AskIn(BaseModel):
-    question: str = Field(..., min_length=3, max_length=2000, examples=["Why is Line 2 vibration high?"])
+    question: str = Field(
+        ..., min_length=3, max_length=2000, examples=["Why is Line 2 vibration high?"]
+    )
     plant_id: str = Field("plant-demo-01")
     lang: Lang = Lang.en
     air_gapped: bool = False
@@ -92,7 +95,9 @@ class CorrelateOut(BaseModel):
 
 class RagIngestIn(BaseModel):
     id: str = Field(..., examples=["runbook-press-01"])
-    text: str = Field(..., min_length=10, examples=["Line 2 pressure high: check valve 3, max 8 bar per runbook."])
+    text: str = Field(
+        ..., min_length=10, examples=["Line 2 pressure high: check valve 3, max 8 bar per runbook."]
+    )
     metadata: dict = Field(default_factory=dict)
 
 

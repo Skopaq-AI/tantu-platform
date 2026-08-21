@@ -1,4 +1,5 @@
 """Gemini ER2 client — real google-genai SDK, grounded generation."""
+
 from __future__ import annotations
 
 import os
@@ -7,7 +8,6 @@ from typing import List, Optional
 
 from ..config import settings
 from .grounding import estimate_tokens, cost_usd
-from .prompts import PROMPT_REGISTRY
 
 log = logging.getLogger(__name__)
 
@@ -131,7 +131,9 @@ class GeminiClient:
             "prompt": prompt_name,
         }
 
-    def _fallback(self, user_prompt: str, variables: dict, rag_doc_ids: List[str]) -> tuple[str, int]:
+    def _fallback(
+        self, user_prompt: str, variables: dict, rag_doc_ids: List[str]
+    ) -> tuple[str, int]:
         """Deterministic grounded fallback — no network."""
         lang = variables.get("lang", "en")
         q = variables.get("question", variables.get("events_json", ""))[:120]
@@ -155,14 +157,35 @@ class GeminiClient:
         return base, estimate_tokens(base)
 
     # Convenience wrappers
-    async def answer(self, question: str, rag_context: str, rag_doc_ids: List[str], plant_id: str = "plant-demo-01", lang: str = "en", top_k: int = 3) -> dict:
+    async def answer(
+        self,
+        question: str,
+        rag_context: str,
+        rag_doc_ids: List[str],
+        plant_id: str = "plant-demo-01",
+        lang: str = "en",
+        top_k: int = 3,
+    ) -> dict:
         return await self.generate(
             "ask_v1",
-            {"question": question, "plant_id": plant_id, "rag_context": rag_context, "lang": lang, "top_k": top_k},
+            {
+                "question": question,
+                "plant_id": plant_id,
+                "rag_context": rag_context,
+                "lang": lang,
+                "top_k": top_k,
+            },
             rag_doc_ids=rag_doc_ids,
         )
 
-    async def correlate(self, events_json: str, rag_context: str, rag_doc_ids: List[str], lang: str = "en", top_k: int = 5) -> dict:
+    async def correlate(
+        self,
+        events_json: str,
+        rag_context: str,
+        rag_doc_ids: List[str],
+        lang: str = "en",
+        top_k: int = 5,
+    ) -> dict:
         return await self.generate(
             "correlate_v1",
             {"events_json": events_json, "rag_context": rag_context, "lang": lang, "top_k": top_k},

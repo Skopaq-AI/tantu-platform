@@ -26,7 +26,7 @@ from contextlib import asynccontextmanager
 
 import cv2
 import numpy as np
-from fastapi import Depends, FastAPI, Header, HTTPException, Response
+from fastapi import Depends, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
@@ -114,7 +114,10 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 async def health_ep():
     snap = health.snapshot()
     # refresh store-forward status
-    snap["components"]["store_forward"] = {"status": "ok" if sf.status()["redis_ok"] else "degraded", "details": sf.status()}
+    snap["components"]["store_forward"] = {
+        "status": "ok" if sf.status()["redis_ok"] else "degraded",
+        "details": sf.status(),
+    }
     return {
         **snap,
         "tier": settings.tier.value,
@@ -151,7 +154,7 @@ async def metrics():
 
 @app.post("/infer/gauge", response_model=GaugeInferOut)
 async def infer_gauge(body: GaugeInferIn, claims: dict | None = Depends(require_auth)):
-    t0 = time.perf_counter()
+    _t0 = time.perf_counter()
     try:
         raw = base64.b64decode(body.image_b64)
         arr = np.frombuffer(raw, dtype=np.uint8)
@@ -194,19 +197,21 @@ async def infer_gauge(body: GaugeInferIn, claims: dict | None = Depends(require_
 
     # store-and-forward (offline-first, never blocks inference)
     try:
-        await sf.enqueue({
-            "station_id": body.station_id,
-            "metric": "gauge_value",
-            "value": str(res.value),
-            "unit": "bar",
-            "confidence": str(res.confidence),
-            "quality": qual,
-            "latency_ms": str(latency_ms),
-            "tier": settings.tier.value,
-            "ts": str(ts),
-            "protocol": "camera",
-            "angle_deg": str(res.angle_deg),
-        })
+        await sf.enqueue(
+            {
+                "station_id": body.station_id,
+                "metric": "gauge_value",
+                "value": str(res.value),
+                "unit": "bar",
+                "confidence": str(res.confidence),
+                "quality": qual,
+                "latency_ms": str(latency_ms),
+                "tier": settings.tier.value,
+                "ts": str(ts),
+                "protocol": "camera",
+                "angle_deg": str(res.angle_deg),
+            }
+        )
         m.store_forward_enqueued_total.labels(dest="gauge").inc()
         m.store_forward_buffered.set(float(sf.depth()))
     except Exception:
@@ -258,17 +263,19 @@ async def infer_vibration(body: VibrationInferIn, claims: dict | None = Depends(
         health.mark_ok("vibration", latency_ms=res.latency_ms)
 
     try:
-        await sf.enqueue({
-            "station_id": body.station_id,
-            "metric": "vibration_rms",
-            "value": str(res.rms),
-            "unit": body.unit,
-            "health": res.health,
-            "dominant_freq": str(res.dominant_freq),
-            "crest": str(res.crest_factor),
-            "tier": settings.tier.value,
-            "ts": str(ts),
-        })
+        await sf.enqueue(
+            {
+                "station_id": body.station_id,
+                "metric": "vibration_rms",
+                "value": str(res.rms),
+                "unit": body.unit,
+                "health": res.health,
+                "dominant_freq": str(res.dominant_freq),
+                "crest": str(res.crest_factor),
+                "tier": settings.tier.value,
+                "ts": str(ts),
+            }
+        )
         m.store_forward_enqueued_total.labels(dest="vibration").inc()
     except Exception:
         pass
@@ -303,7 +310,9 @@ async def infer_thermal(body: ThermalReadIn, claims: dict | None = Depends(requi
     if body.calibrate_two_point:
         c = body.calibrate_two_point
         try:
-            cfg = probe.calibrate_two_point(float(c["raw_low"]), float(c["ref_low"]), float(c["raw_high"]), float(c["ref_high"]))
+            _cfg = probe.calibrate_two_point(
+                float(c["raw_low"]), float(c["ref_low"]), float(c["raw_high"]), float(c["ref_high"])
+            )
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"calibration error: {e}")
 
@@ -331,16 +340,18 @@ async def infer_thermal(body: ThermalReadIn, claims: dict | None = Depends(requi
     health.mark_ok("thermal", latency_ms=res.latency_ms)
 
     try:
-        await sf.enqueue({
-            "station_id": res.probe_id,
-            "metric": "bearing_temp_c",
-            "value": str(res.value),
-            "unit": res.unit,
-            "quality": res.quality,
-            "raw": str(res.raw),
-            "tier": settings.tier.value,
-            "ts": str(res.timestamp),
-        })
+        await sf.enqueue(
+            {
+                "station_id": res.probe_id,
+                "metric": "bearing_temp_c",
+                "value": str(res.value),
+                "unit": res.unit,
+                "quality": res.quality,
+                "raw": str(res.raw),
+                "tier": settings.tier.value,
+                "ts": str(res.timestamp),
+            }
+        )
     except Exception:
         pass
 
@@ -377,16 +388,18 @@ async def infer_ct(body: CTInferIn, claims: dict | None = Depends(require_auth))
         pass
     health.mark_ok("ct", latency_ms=res.latency_ms)
     try:
-        await sf.enqueue({
-            "station_id": body.station_id,
-            "metric": "current_rms_a",
-            "value": str(res.rms_a),
-            "unit": "A",
-            "signature": res.signature,
-            "thd": str(res.thd_percent),
-            "tier": settings.tier.value,
-            "ts": str(ts),
-        })
+        await sf.enqueue(
+            {
+                "station_id": body.station_id,
+                "metric": "current_rms_a",
+                "value": str(res.rms_a),
+                "unit": "A",
+                "signature": res.signature,
+                "thd": str(res.thd_percent),
+                "tier": settings.tier.value,
+                "ts": str(ts),
+            }
+        )
     except Exception:
         pass
     return CTOut(

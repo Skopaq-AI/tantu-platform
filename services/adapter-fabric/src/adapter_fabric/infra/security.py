@@ -1,11 +1,12 @@
 """JWT auth — mirrors backend/src/infra/security.py (HS256, dev key fallback)."""
+
 from __future__ import annotations
 
 import os
 import time
 from typing import Optional
 
-from fastapi import Depends, HTTPException, Header, status
+from fastapi import HTTPException, Header, status
 from jose import JWTError, jwt
 
 ALG = "HS256"
@@ -15,7 +16,14 @@ ISSUER = os.getenv("JWT_ISSUER", "tantu")
 
 def issue_jwt(sub: str, plant_id: str, role: str, exp_min: int = 60) -> str:
     now = int(time.time())
-    payload = {"sub": sub, "plant_id": plant_id, "role": role, "exp": now + exp_min * 60, "iat": now, "iss": ISSUER}
+    payload = {
+        "sub": sub,
+        "plant_id": plant_id,
+        "role": role,
+        "exp": now + exp_min * 60,
+        "iat": now,
+        "iss": ISSUER,
+    }
     return jwt.encode(payload, SECRET, algorithm=ALG)
 
 
@@ -38,10 +46,14 @@ async def require_auth(authorization: Optional[str] = Header(None)) -> dict:
     try:
         claims = verify_jwt(token)
     except JWTError as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Invalid token: {e}") from e
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Invalid token: {e}"
+        ) from e
     # exp is validated by jose; ensure required claims
     if "sub" not in claims or "plant_id" not in claims:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token missing required claims")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token missing required claims"
+        )
     return claims
 
 

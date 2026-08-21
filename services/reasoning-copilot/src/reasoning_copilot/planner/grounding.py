@@ -1,4 +1,5 @@
 """Grounding, token counting, hallucination guard, costing."""
+
 from __future__ import annotations
 
 import re
@@ -7,10 +8,12 @@ from typing import List, Set
 
 # ---- token / cost -----------------------------------------------------------
 
+
 def estimate_tokens(text: str) -> int:
     """Approx tokens — ~4 chars per token, with tiktoken fallback if installed."""
     try:
         import tiktoken  # type: ignore
+
         enc = tiktoken.get_encoding("cl100k_base")
         return len(enc.encode(text))
     except Exception:
@@ -22,7 +25,9 @@ def estimate_tokens(text: str) -> int:
         return max(by_chars, by_words)
 
 
-def cost_usd(tokens_in: int, tokens_out: int, in_per_m: float = 2.0, out_per_m: float = 10.0) -> float:
+def cost_usd(
+    tokens_in: int, tokens_out: int, in_per_m: float = 2.0, out_per_m: float = 10.0
+) -> float:
     return round(tokens_in / 1_000_000 * in_per_m + tokens_out / 1_000_000 * out_per_m, 6)
 
 
@@ -66,8 +71,7 @@ def grounding_check(answer: str, rag_doc_ids: List[str], require_citation: bool 
     rag_set = set(rag_doc_ids)
     unknown = cited - rag_set
     has_valid = len(cited & rag_set) > 0
-    low = answer.lower()
-    suspicious = []
+    suspicious = []  # low = answer.lower() reserved for future locale check
     for pat in SUSPICIOUS_PATTERNS:
         m = pat.search(answer)
         if m:
@@ -81,11 +85,15 @@ def grounding_check(answer: str, rag_doc_ids: List[str], require_citation: bool 
         "unknown_citations": sorted(unknown),
         "deferred": contains_honest_deferral(answer),
         "suspicious_numbers": suspicious,
-        "requires_citation_but_missing": require_citation and not has_valid and not contains_honest_deferral(answer),
+        "requires_citation_but_missing": require_citation
+        and not has_valid
+        and not contains_honest_deferral(answer),
     }
 
 
-def hallucination_guard(answer: str, rag_doc_ids: List[str], rag_context: str = "", require_citation: bool = True) -> str:
+def hallucination_guard(
+    answer: str, rag_doc_ids: List[str], rag_context: str = "", require_citation: bool = True
+) -> str:
     """Enforce grounded generation.
 
     If answer lacks citations but should have them, append deferral + strip simulated numbers

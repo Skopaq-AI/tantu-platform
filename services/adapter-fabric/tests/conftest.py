@@ -1,8 +1,10 @@
 """pytest fixtures."""
+
 import pytest
 from fastapi.testclient import TestClient
 
 import sys
+
 sys.path.insert(0, "src")
 
 from adapter_fabric.api.main import app

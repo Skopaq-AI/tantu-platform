@@ -6,6 +6,7 @@
 - QoS, keepalive, LWT, reconnect with backoff
 - Normalization + tag-map compounding
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -101,7 +102,7 @@ class MqttAdapter(BaseAdapter):
         port = int(self.config.params.get("port", 1883))
         client_id = self.config.params.get("client_id", f"adapter-fabric-{self.adapter_id}")
         keepalive = int(self.config.params.get("keepalive", 60))
-        qos = int(self.config.params.get("qos", 1))
+        _qos = int(self.config.params.get("qos", 1))  # reserved for future QoS handling
         username = self.config.params.get("username")
         password = self.config.params.get("password")
 
@@ -123,7 +124,9 @@ class MqttAdapter(BaseAdapter):
             self._client.on_disconnect = self._on_disconnect  # type: ignore
             # LWT
             try:
-                self._client.will_set(f"tantu/adapter/{self.adapter_id}/status", payload="offline", qos=1, retain=True)  # type: ignore
+                self._client.will_set(
+                    f"tantu/adapter/{self.adapter_id}/status", payload="offline", qos=1, retain=True
+                )  # type: ignore
             except Exception:
                 pass
 
@@ -157,19 +160,19 @@ class MqttAdapter(BaseAdapter):
             return
         self._status = "ok"
         self._last_ok_ts = time.time()
-        qos = int(self.config.params.get("qos", 1))
+        _qos = int(self.config.params.get("qos", 1))  # reserved for future QoS handling
         # explicit topics param overrides tag-derived topics
         topics = self.config.params.get("topics")
         if topics:
             for t in topics:
                 try:
-                    client.subscribe(t, qos=qos)  # type: ignore
+                    client.subscribe(t, qos=_qos)  # type: ignore
                 except Exception:
                     pass
         else:
             for topic in self._topic_to_mappings:
                 try:
-                    client.subscribe(topic, qos=qos)  # type: ignore
+                    client.subscribe(topic, qos=_qos)  # type: ignore
                 except Exception:
                     pass
 
@@ -255,7 +258,11 @@ class MqttAdapter(BaseAdapter):
             if var_for_topic is None:
                 var_for_topic = next(iter(tm.source_tags))
             # extract numeric
-            json_path = self.config.params.get("json_path") or tm.params.get("json_path") if hasattr(tm, "params") else None  # type: ignore
+            json_path = (
+                self.config.params.get("json_path") or tm.params.get("json_path")
+                if hasattr(tm, "params")
+                else None
+            )  # type: ignore
             # TagMapping has no params; use config json_path
             raw_val = _extract_json_path(data, json_path) if isinstance(data, dict) else data
             try:
@@ -273,7 +280,9 @@ class MqttAdapter(BaseAdapter):
                     value = compound(dict(bucket), tm)
                 except Exception:
                     return
-                reading = self._reading(metric=tm.metric, value=value, unit=tm.unit, source_tag=topic, raw_value=None)
+                reading = self._reading(
+                    metric=tm.metric, value=value, unit=tm.unit, source_tag=topic, raw_value=None
+                )
                 reading = NormalizedReading(
                     station_id=reading.station_id,
                     metric=reading.metric,
@@ -308,7 +317,9 @@ class MqttAdapter(BaseAdapter):
             except Exception:
                 return
         value = apply_tag_mapping(fval, tm)
-        reading = self._reading(metric=tm.metric, value=value, unit=tm.unit, source_tag=topic, raw_value=fval)
+        reading = self._reading(
+            metric=tm.metric, value=value, unit=tm.unit, source_tag=topic, raw_value=fval
+        )
         await self._enqueue(reading)
 
     async def _enqueue(self, reading: NormalizedReading) -> None:
@@ -327,7 +338,9 @@ class MqttAdapter(BaseAdapter):
         try:
             from ...infra import metrics as m
 
-            m.READINGS_TOTAL.labels(protocol=self.protocol, adapter_id=self.adapter_id, metric=reading.metric).inc()
+            m.READINGS_TOTAL.labels(
+                protocol=self.protocol, adapter_id=self.adapter_id, metric=reading.metric
+            ).inc()
             m.ADAPTER_UP.labels(protocol=self.protocol, adapter_id=self.adapter_id).set(1)
         except Exception:
             pass

@@ -1,4 +1,5 @@
 """OpenTelemetry wiring — no-op if endpoint not configured."""
+
 from __future__ import annotations
 
 import os

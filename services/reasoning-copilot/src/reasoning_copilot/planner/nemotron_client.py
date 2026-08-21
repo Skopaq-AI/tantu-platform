@@ -1,4 +1,5 @@
 """Nemotron-9B on-prem client — real HTTP path via vLLM (OpenAI-compat) or Ollama."""
+
 from __future__ import annotations
 
 import logging
@@ -67,7 +68,9 @@ class NemotronClient:
                     try:
                         return data["choices"][0]["message"]["content"]
                     except Exception:
-                        return data.get("choices", [{}])[0].get("text", "") or json.dumps(data)[:500]
+                        return (
+                            data.get("choices", [{}])[0].get("text", "") or json.dumps(data)[:500]
+                        )
                 log.warning("vLLM %s -> %s %s", url, r.status_code, r.text[:300])
         except Exception as e:
             log.info("vLLM not reachable (%s): %s", url, e)
@@ -156,8 +159,8 @@ class NemotronClient:
         q = variables.get("question", variables.get("events_json", ""))[:120]
         if "events_json" in variables:
             base = (
-                f"[on-prem Nemotron] Correlation: pressure drift suspected at Line 2 — valve 3. "
-                f"Offline reasoning, grounded on runbook."
+                "[on-prem Nemotron] Correlation: pressure drift suspected at Line 2 — valve 3. "
+                "Offline reasoning, grounded on runbook."
             )
         else:
             base = f"[on-prem Nemotron] Answer for '{q.strip()}' grounded on local runbook. Lang={lang}."
@@ -169,8 +172,37 @@ class NemotronClient:
             base += " needs human check"
         return base, estimate_tokens(base)
 
-    async def answer(self, question: str, rag_context: str, rag_doc_ids: List[str], plant_id: str = "plant-demo-01", lang: str = "en", top_k: int = 3) -> dict:
-        return await self.generate("ask_v1", {"question": question, "plant_id": plant_id, "rag_context": rag_context, "lang": lang, "top_k": top_k}, rag_doc_ids)
+    async def answer(
+        self,
+        question: str,
+        rag_context: str,
+        rag_doc_ids: List[str],
+        plant_id: str = "plant-demo-01",
+        lang: str = "en",
+        top_k: int = 3,
+    ) -> dict:
+        return await self.generate(
+            "ask_v1",
+            {
+                "question": question,
+                "plant_id": plant_id,
+                "rag_context": rag_context,
+                "lang": lang,
+                "top_k": top_k,
+            },
+            rag_doc_ids,
+        )
 
-    async def correlate(self, events_json: str, rag_context: str, rag_doc_ids: List[str], lang: str = "en", top_k: int = 5) -> dict:
-        return await self.generate("correlate_v1", {"events_json": events_json, "rag_context": rag_context, "lang": lang, "top_k": top_k}, rag_doc_ids)
+    async def correlate(
+        self,
+        events_json: str,
+        rag_context: str,
+        rag_doc_ids: List[str],
+        lang: str = "en",
+        top_k: int = 5,
+    ) -> dict:
+        return await self.generate(
+            "correlate_v1",
+            {"events_json": events_json, "rag_context": rag_context, "lang": lang, "top_k": top_k},
+            rag_doc_ids,
+        )

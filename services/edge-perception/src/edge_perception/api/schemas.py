@@ -62,7 +62,9 @@ class VibrationInferOut(BaseModel):
 
 class ThermalReadIn(BaseModel):
     probe_id: str = "probe-01"
-    raw: float | None = Field(default=None, description="Inject raw value (test); if None, reads 1-Wire")
+    raw: float | None = Field(
+        default=None, description="Inject raw value (test); if None, reads 1-Wire"
+    )
     calibrate_two_point: dict | None = None  # {raw_low, ref_low, raw_high, ref_high}
 
 

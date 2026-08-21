@@ -1,38 +1,31 @@
 """FastAPI service — adapter-fabric on :8001. Hexagonal entry point."""
+
 from __future__ import annotations
 
-import asyncio
-import json
 import time
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
 from ..application.registry import AdapterRegistry
 from ..application.pipeline import Pipeline
 from ..application.normalizer import detect_defect
-from ..domain.events import DefectEvent, DefectClass, Track, NormalizedReading, Quality
+from ..domain.events import NormalizedReading, Quality
 from ..domain.models import AdapterConfig, TagMapping, Protocol
 from ..infra.logging import configure_logging, get_logger
-from ..infra.nats import NatsPublisher, get_publisher, set_publisher
+from ..infra.nats import NatsPublisher, set_publisher
 from ..infra.security import require_auth, optional_auth, issue_jwt
 from ..infra import metrics as prom
 from ..infra.telemetry import configure_tracing
 from .schemas import (
     AdapterConfigIn,
-    AdapterConfigOut,
-    HealthOut,
-    ReadingOut,
-    DefectEventOut,
     IngestReadingIn,
     TokenIn,
-    TagMappingIn,
 )
-from .deps import get_registry, get_nats, set_registry
+from .deps import set_registry
 
 configure_logging()
 logger = get_logger("adapter_fabric.api")
@@ -91,7 +84,10 @@ def _to_adapter_config(inp: AdapterConfigIn) -> AdapterConfig:
     try:
         proto = Protocol(inp.protocol.lower())
     except ValueError:
-        raise HTTPException(status_code=422, detail=f"Unknown protocol: {inp.protocol}. Allowed: {[p.value for p in Protocol]}")
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unknown protocol: {inp.protocol}. Allowed: {[p.value for p in Protocol]}",
+        )
     tags = tuple(
         TagMapping(
             source_tag=t.source_tag,
@@ -137,11 +133,23 @@ def _reading_to_out(r: NormalizedReading) -> Dict[str, Any]:
 async def health():
     adapters = await _registry_global.health_all()
     nats_ok = getattr(_publisher_global, "_nc", None) is not None
-    overall = "ok" if all(a.get("status") in ("ok", "unknown") or a.get("status") == "ok" for a in adapters) or not adapters else "degraded"
+    overall = (
+        "ok"
+        if all(a.get("status") in ("ok", "unknown") or a.get("status") == "ok" for a in adapters)
+        or not adapters
+        else "degraded"
+    )
     # if no adapters, ok
     if not adapters:
         overall = "ok"
-    return {"status": overall, "service": "adapter-fabric", "version": "0.1.0", "adapters": adapters, "nats_connected": bool(nats_ok), "ts": time.time()}
+    return {
+        "status": overall,
+        "service": "adapter-fabric",
+        "version": "0.1.0",
+        "adapters": adapters,
+        "nats_connected": bool(nats_ok),
+        "ts": time.time(),
+    }
 
 
 @app.get("/metrics", tags=["ops"], summary="Prometheus metrics")
@@ -156,7 +164,17 @@ async def info():
         "name": "adapter-fabric",
         "version": "0.1.0",
         "protocols": [p.value for p in Protocol],
-        "canonical_schema": ["station_id", "metric", "value", "unit", "timestamp", "quality", "protocol", "adapter_id", "source_tag"],
+        "canonical_schema": [
+            "station_id",
+            "metric",
+            "value",
+            "unit",
+            "timestamp",
+            "quality",
+            "protocol",
+            "adapter_id",
+            "source_tag",
+        ],
         "frames_never_leave": True,
         "defect_event_has_no_image_field": True,
     }
@@ -168,7 +186,11 @@ async def info():
 @app.post("/auth/token", tags=["auth"], summary="Issue JWT (demo)")
 async def auth_token(body: TokenIn):
     tok = issue_jwt(sub=body.sub, plant_id=body.plant_id, role=body.role, exp_min=body.exp_min)
-    return {"access_token": tok, "token_type": "bearer", "claims": {"sub": body.sub, "plant_id": body.plant_id, "role": body.role}}
+    return {
+        "access_token": tok,
+        "token_type": "bearer",
+        "claims": {"sub": body.sub, "plant_id": body.plant_id, "role": body.role},
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +204,12 @@ async def register_adapter(body: AdapterConfigIn, claims: dict = Depends(require
     if _pipeline and _pipeline._running:
         await _pipeline.attach_adapter(adapter)
     logger.info("adapter registered", adapter_id=cfg.adapter_id, protocol=cfg.protocol.value)
-    return {"adapter_id": adapter.adapter_id, "protocol": adapter.protocol, "station_id": cfg.station_id, "status": (await adapter.health()).status}
+    return {
+        "adapter_id": adapter.adapter_id,
+        "protocol": adapter.protocol,
+        "station_id": cfg.station_id,
+        "status": (await adapter.health()).status,
+    }
 
 
 @app.get("/adapters", tags=["adapters"], summary="List adapters")
@@ -194,13 +221,33 @@ async def list_adapters(claims: dict = Depends(optional_auth)):
         out.append(
             {
                 "adapter_id": cfg.adapter_id,
-                "protocol": cfg.protocol.value if hasattr(cfg.protocol, "value") else str(cfg.protocol),
+                "protocol": cfg.protocol.value
+                if hasattr(cfg.protocol, "value")
+                else str(cfg.protocol),
                 "station_id": cfg.station_id,
                 "enabled": cfg.enabled,
                 "poll_interval_ms": cfg.poll_interval_ms,
-                "tags": [{"source_tag": t.source_tag, "metric": t.metric, "unit": t.unit, "scale": t.scale, "offset": t.offset, "data_type": t.data_type, "compound_formula": t.compound_formula, "source_tags": t.source_tags} for t in cfg.tags],
+                "tags": [
+                    {
+                        "source_tag": t.source_tag,
+                        "metric": t.metric,
+                        "unit": t.unit,
+                        "scale": t.scale,
+                        "offset": t.offset,
+                        "data_type": t.data_type,
+                        "compound_formula": t.compound_formula,
+                        "source_tags": t.source_tags,
+                    }
+                    for t in cfg.tags
+                ],
                 "params": cfg.params,
-                "health": {"status": h.status, "last_ok_ts": h.last_ok_ts, "last_error": h.last_error, "message_count": h.message_count, "error_count": h.error_count},
+                "health": {
+                    "status": h.status,
+                    "last_ok_ts": h.last_ok_ts,
+                    "last_error": h.last_error,
+                    "message_count": h.message_count,
+                    "error_count": h.error_count,
+                },
             }
         )
     return out
@@ -219,9 +266,27 @@ async def get_adapter(adapter_id: str):
         "station_id": cfg.station_id,
         "enabled": cfg.enabled,
         "poll_interval_ms": cfg.poll_interval_ms,
-        "tags": [{"source_tag": t.source_tag, "metric": t.metric, "unit": t.unit, "scale": t.scale, "offset": t.offset, "data_type": t.data_type, "compound_formula": t.compound_formula, "source_tags": t.source_tags} for t in cfg.tags],
+        "tags": [
+            {
+                "source_tag": t.source_tag,
+                "metric": t.metric,
+                "unit": t.unit,
+                "scale": t.scale,
+                "offset": t.offset,
+                "data_type": t.data_type,
+                "compound_formula": t.compound_formula,
+                "source_tags": t.source_tags,
+            }
+            for t in cfg.tags
+        ],
         "params": cfg.params,
-        "health": {"status": h.status, "last_ok_ts": h.last_ok_ts, "last_error": h.last_error, "message_count": h.message_count, "error_count": h.error_count},
+        "health": {
+            "status": h.status,
+            "last_ok_ts": h.last_ok_ts,
+            "last_error": h.last_error,
+            "message_count": h.message_count,
+            "error_count": h.error_count,
+        },
     }
 
 
@@ -251,7 +316,11 @@ async def stop_adapter(adapter_id: str, claims: dict = Depends(require_auth)):
     return {"adapter_id": adapter_id, "status": (await ad.health()).status}
 
 
-@app.post("/adapters/{adapter_id}/poll", tags=["adapters"], summary="Poll once and return normalized readings")
+@app.post(
+    "/adapters/{adapter_id}/poll",
+    tags=["adapters"],
+    summary="Poll once and return normalized readings",
+)
 async def poll_adapter(adapter_id: str, claims: dict = Depends(optional_auth)):
     ad = await _registry_global.get(adapter_id)
     if not ad:
@@ -285,7 +354,9 @@ async def readings_all(claims: dict = Depends(optional_auth)):
     return all_readings
 
 
-@app.post("/ingest", tags=["telemetry"], summary="Direct ingest of a normalized reading (for gateways)")
+@app.post(
+    "/ingest", tags=["telemetry"], summary="Direct ingest of a normalized reading (for gateways)"
+)
 async def ingest_reading(body: IngestReadingIn, claims: dict = Depends(optional_auth)):
     r = NormalizedReading(
         station_id=body.station_id,
@@ -304,19 +375,39 @@ async def ingest_reading(body: IngestReadingIn, claims: dict = Depends(optional_
         await _publisher_global.publish_reading(r)
     ev = detect_defect(r)
     if ev:
-        return {"reading": _reading_to_out(r), "defect": {"station_id": ev.station_id, "track": ev.track.value, "defect_class": ev.defect_class.value, "confidence": ev.confidence, "protocol": ev.protocol}}
+        return {
+            "reading": _reading_to_out(r),
+            "defect": {
+                "station_id": ev.station_id,
+                "track": ev.track.value,
+                "defect_class": ev.defect_class.value,
+                "confidence": ev.confidence,
+                "protocol": ev.protocol,
+            },
+        }
     return {"reading": _reading_to_out(r), "defect": None}
 
 
 @app.get("/events", tags=["telemetry"], summary="Synthetic derived DefectEvents (demo)")
 async def list_events(limit: int = Query(default=5, ge=1, le=100)):
-    from ..domain.events import make_event, DefectClass
+    from ..domain.events import make_event
 
     protos = ["opcua", "modbus", "mqtt", "mtconnect", "ethernet_ip", "camera"]
     out = []
     for i in range(limit):
         ev = make_event(proto=protos[i % len(protos)])
-        out.append({"station_id": ev.station_id, "track": ev.track.value, "defect_class": ev.defect_class.value, "confidence": ev.confidence, "latency_ms": ev.latency_ms, "timestamp": ev.timestamp, "protocol": ev.protocol, "adapter_id": ev.adapter_id})
+        out.append(
+            {
+                "station_id": ev.station_id,
+                "track": ev.track.value,
+                "defect_class": ev.defect_class.value,
+                "confidence": ev.confidence,
+                "latency_ms": ev.latency_ms,
+                "timestamp": ev.timestamp,
+                "protocol": ev.protocol,
+                "adapter_id": ev.adapter_id,
+            }
+        )
     return out
 
 

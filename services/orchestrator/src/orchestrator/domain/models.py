@@ -1,8 +1,8 @@
 """Domain models for persistence view — not ORM, just value objects."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass(frozen=True, slots=True)

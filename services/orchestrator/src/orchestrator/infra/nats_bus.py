@@ -1,7 +1,7 @@
 """NATS bus — subscriber for derived events, publisher for reports."""
+
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 from typing import Callable, Awaitable, Optional
@@ -26,6 +26,7 @@ class NatsBus:
     async def connect(self) -> bool:
         try:
             import nats  # type: ignore
+
             self._nc = await nats.connect(self.url, connect_timeout=3, max_reconnect_attempts=3)
             log.info("orchestrator NATS connected to %s", self.url)
             return True
@@ -63,6 +64,7 @@ class NatsBus:
                 await handler(ev)
             except Exception as e:
                 log.warning("NATS handler error: %s", e)
+
         return _cb
 
     async def publish_report(self, subject: Optional[str], payload: dict) -> None:
@@ -115,6 +117,7 @@ def _parse_event(data: dict) -> Optional[DefectEvent]:
         ts = data.get("timestamp")
         if ts is None:
             import time
+
             ts = time.time()
         else:
             ts = float(ts)

@@ -1,10 +1,10 @@
 """NATS publisher — real nats-py, graceful fallback to in-memory when NATS unavailable."""
+
 from __future__ import annotations
 
 import asyncio
 import json
 import os
-from dataclasses import asdict
 from typing import Optional
 
 from ..domain.events import DefectEvent, NormalizedReading
@@ -21,7 +21,9 @@ def _event_to_json(ev: DefectEvent) -> bytes:
     d = {
         "station_id": ev.station_id,
         "track": ev.track.value if hasattr(ev.track, "value") else str(ev.track),
-        "defect_class": ev.defect_class.value if hasattr(ev.defect_class, "value") else str(ev.defect_class),
+        "defect_class": ev.defect_class.value
+        if hasattr(ev.defect_class, "value")
+        else str(ev.defect_class),
         "confidence": ev.confidence,
         "latency_ms": ev.latency_ms,
         "timestamp": ev.timestamp,

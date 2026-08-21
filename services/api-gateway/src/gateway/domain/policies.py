@@ -5,6 +5,7 @@ Policy structure mimics OPA Rego decisions:
 
 No grants are implicit — default deny.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -55,6 +56,7 @@ ROLE_PERMISSIONS: dict[str, set[tuple[str, str]]] = {
         ("health", "health"),
     },
 }
+
 
 # ── Resource mapping — maps (service, path, method) → (resource, action) ──
 def _infer_resource_action(service: str, path: str, method: str) -> tuple[str, str]:
@@ -118,7 +120,7 @@ def _role_allows(role: str, action: str, resource: str) -> tuple[bool, Optional[
     if (action, resource) in perms:
         return True, (action, resource)
     # wildcard checks
-    for (a, r) in perms:
+    for a, r in perms:
         if a == "*" and r == "*":
             return True, (a, r)
         if a == "*" and r == resource:
@@ -138,7 +140,9 @@ def evaluate(principal: Principal, resource: Resource) -> PolicyDecision:
     """
     # Normalize
     role = principal.role
-    inferred_res, inferred_action = _infer_resource_action(resource.service, resource.path, resource.method)
+    inferred_res, inferred_action = _infer_resource_action(
+        resource.service, resource.path, resource.method
+    )
     # Choose effective action/resource
     # - If caller passed explicit non-default action (not "", "read", "*"), respect it
     # - If caller passed "*", resolve to inferred action (treat "*" as "any — infer")
@@ -158,7 +162,9 @@ def evaluate(principal: Principal, resource: Resource) -> PolicyDecision:
     if not allowed:
         # Try wildcard action/resource fallback: some roles use read:* pattern — we already handled "*" wildcards
         # No allow
-        return PolicyDecision(False, f"RBAC deny: role '{role}' lacks {eff_action}:{eff_resource}", None)
+        return PolicyDecision(
+            False, f"RBAC deny: role '{role}' lacks {eff_action}:{eff_resource}", None
+        )
 
     # ABAC — plant_id scoping
     # If resource has no plant scope, RBAC alone suffices
@@ -178,4 +184,6 @@ def evaluate(principal: Principal, resource: Resource) -> PolicyDecision:
             matched,
         )
 
-    return PolicyDecision(True, f"allow: {role} → {eff_action}:{eff_resource} @ plant {resource.plant_id}", matched)
+    return PolicyDecision(
+        True, f"allow: {role} → {eff_action}:{eff_resource} @ plant {resource.plant_id}", matched
+    )

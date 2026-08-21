@@ -19,10 +19,11 @@ export function SelectTrigger({ value, onValueChange, children, className }: any
 }
 
 export function SelectContent({ children, onValueChange, setOpen }: any) {
-  SelectContent.displayName = "SelectContent";
+
   return <div className="p-1">{React.Children.map(children, (c: any) => React.cloneElement(c, { onValueChange, setOpen }))}</div>;
 }
 
+SelectContent.displayName = "SelectContent";
 export function SelectItem({ value, children, onValueChange, setOpen }: any) {
   return <button onClick={() => { onValueChange?.(value); setOpen?.(false); }} className="w-full text-left px-2 py-1.5 text-sm hover:bg-slate-100 rounded">{children}</button>;
 }

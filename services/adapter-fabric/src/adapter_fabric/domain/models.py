@@ -1,4 +1,5 @@
 """Domain models — tag maps, normalization config, compounding."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -52,6 +53,21 @@ class AdapterConfig:
 class NormalizedSchema:
     """Documents the canonical shape; used for OpenAPI / validation tests."""
 
-    required_fields: tuple[str, ...] = ("station_id", "metric", "value", "unit", "timestamp", "quality", "protocol")
+    required_fields: tuple[str, ...] = (
+        "station_id",
+        "metric",
+        "value",
+        "unit",
+        "timestamp",
+        "quality",
+        "protocol",
+    )
     allowed_quality: tuple[str, ...] = ("good", "uncertain", "bad")
-    allowed_protocol: tuple[str, ...] = ("opcua", "modbus", "mqtt", "mtconnect", "ethernet_ip", "camera")
+    allowed_protocol: tuple[str, ...] = (
+        "opcua",
+        "modbus",
+        "mqtt",
+        "mtconnect",
+        "ethernet_ip",
+        "camera",
+    )

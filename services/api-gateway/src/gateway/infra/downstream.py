@@ -1,4 +1,5 @@
 """Downstream reverse proxy — httpx AsyncClient, header propagation, error mapping."""
+
 from __future__ import annotations
 
 import logging
@@ -20,7 +21,9 @@ class DownstreamClient:
 
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
-            self._client = httpx.AsyncClient(timeout=httpx.Timeout(self.timeout_s), follow_redirects=False)
+            self._client = httpx.AsyncClient(
+                timeout=httpx.Timeout(self.timeout_s), follow_redirects=False
+            )
         return self._client
 
     async def proxy(
@@ -35,7 +38,7 @@ class DownstreamClient:
         base = downstream_base.rstrip("/")
         path = downstream_path
         if strip_prefix and path.startswith(strip_prefix):
-            path = path[len(strip_prefix):]
+            path = path[len(strip_prefix) :]
             if not path.startswith("/"):
                 path = "/" + path
         url = f"{base}{path}"
@@ -43,7 +46,17 @@ class DownstreamClient:
             url = f"{url}?{request.url.query}"
 
         # Filter hop-by-hop headers
-        hop_by_hop = {"host", "content-length", "connection", "keep-alive", "transfer-encoding", "te", "trailer", "upgrade", "proxy-connection"}
+        hop_by_hop = {
+            "host",
+            "content-length",
+            "connection",
+            "keep-alive",
+            "transfer-encoding",
+            "te",
+            "trailer",
+            "upgrade",
+            "proxy-connection",
+        }
         headers = {k: v for k, v in request.headers.items() if k.lower() not in hop_by_hop}
         if extra_headers:
             headers.update(extra_headers)
@@ -62,7 +75,9 @@ class DownstreamClient:
             downstream_resp = await client.request(method, url, headers=headers, content=body)
         except httpx.ConnectError as e:
             log.warning("downstream connect error %s -> %s: %s", method, url, e)
-            raise DownstreamError(f"Downstream {base} unreachable", downstream=base, status=502) from e
+            raise DownstreamError(
+                f"Downstream {base} unreachable", downstream=base, status=502
+            ) from e
         except httpx.TimeoutException as e:
             log.warning("downstream timeout %s -> %s: %s", method, url, e)
             raise DownstreamError(f"Downstream {base} timeout", downstream=base, status=504) from e
@@ -71,7 +86,9 @@ class DownstreamClient:
             raise DownstreamError(f"Downstream error: {e}", downstream=base, status=502) from e
 
         # Build response — strip hop-by-hop from downstream as well
-        resp_headers = {k: v for k, v in downstream_resp.headers.items() if k.lower() not in hop_by_hop}
+        resp_headers = {
+            k: v for k, v in downstream_resp.headers.items() if k.lower() not in hop_by_hop
+        }
         # Content-type passthrough
         return Response(
             content=downstream_resp.content,
@@ -90,9 +107,21 @@ class DownstreamClient:
                 body = r.json()
             except Exception:
                 body = r.text[:500]
-            return {"name": base_url, "url": url, "status": "ok" if r.status_code < 400 else "error", "code": r.status_code, "body": body}
+            return {
+                "name": base_url,
+                "url": url,
+                "status": "ok" if r.status_code < 400 else "error",
+                "code": r.status_code,
+                "body": body,
+            }
         except Exception as e:
-            return {"name": base_url, "url": url, "status": "down", "code": 0, "error": str(e)[:300]}
+            return {
+                "name": base_url,
+                "url": url,
+                "status": "down",
+                "code": 0,
+                "error": str(e)[:300],
+            }
 
     async def close(self) -> None:
         if self._client is not None:

@@ -1,4 +1,5 @@
 """Reasoning-copilot client — calls POST /correlate or fallback, with stub on failure."""
+
 from __future__ import annotations
 
 import logging
@@ -23,7 +24,9 @@ class ReasoningCopilotClient:
             self._client = httpx.AsyncClient(timeout=httpx.Timeout(self.timeout_s))
         return self._client
 
-    async def correlate(self, events: List[DefectEvent], plant_id: Optional[str] = None) -> CorrelationReport:
+    async def correlate(
+        self, events: List[DefectEvent], plant_id: Optional[str] = None
+    ) -> CorrelationReport:
         """Call reasoning-copilot. Falls back to deterministic stub if unreachable."""
         payload = {
             "plant_id": plant_id or (events[0].plant_id if events else "plant-demo-01"),
@@ -55,7 +58,9 @@ class ReasoningCopilotClient:
                     # Normalize response shape
                     return CorrelationReport(
                         plant_id=data.get("plant_id", payload["plant_id"]),
-                        summary=data.get("summary") or data.get("answer") or "Correlated via reasoning-copilot",
+                        summary=data.get("summary")
+                        or data.get("answer")
+                        or "Correlated via reasoning-copilot",
                         contributing=data.get("contributing") or [e.station_id for e in events],
                         confidence=float(data.get("confidence", 0.92)),
                         tokens_in=int(data.get("tokens_in", 0)),

@@ -6,6 +6,7 @@ Exposes:
   RateLimiter — async, shared via lifespan.
   _InMemoryBucket — for unit tests without Redis.
 """
+
 from __future__ import annotations
 
 import time
@@ -64,7 +65,10 @@ class RateLimiter:
             return
         try:
             import redis.asyncio as redis  # type: ignore[import-not-found]
-            self._redis = redis.from_url(self.redis_url, decode_responses=True, socket_connect_timeout=1)
+
+            self._redis = redis.from_url(
+                self.redis_url, decode_responses=True, socket_connect_timeout=1
+            )
             await self._redis.ping()
             self._redis_available = True
             log.info("gateway rate_limit: Redis connected at %s", self.redis_url)

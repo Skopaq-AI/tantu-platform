@@ -16,6 +16,7 @@ Config params:
   gauge: {radius_range: [min,max], dp, min_dist, param1, param2} — Hough tuning
   detection_interval_ms: int
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -73,7 +74,9 @@ def _order_points(pts: np.ndarray) -> np.ndarray:
     return rect
 
 
-def perspective_correct(image: np.ndarray, src_points: Optional[np.ndarray] = None, dst_size: int = 400) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+def perspective_correct(
+    image: np.ndarray, src_points: Optional[np.ndarray] = None, dst_size: int = 400
+) -> Tuple[np.ndarray, Optional[np.ndarray]]:
     """Warp image to frontal view.
 
     If src_points provided (4x2), uses them. Otherwise tries to auto-detect gauge contour.
@@ -84,7 +87,10 @@ def perspective_correct(image: np.ndarray, src_points: Optional[np.ndarray] = No
     h, w = image.shape[:2]
     if src_points is not None:
         src = _order_points(np.array(src_points, dtype="float32"))
-        dst = np.array([[0, 0], [dst_size - 1, 0], [dst_size - 1, dst_size - 1], [0, dst_size - 1]], dtype="float32")
+        dst = np.array(
+            [[0, 0], [dst_size - 1, 0], [dst_size - 1, dst_size - 1], [0, dst_size - 1]],
+            dtype="float32",
+        )
         M = cv2.getPerspectiveTransform(src, dst)
         warped = cv2.warpPerspective(image, M, (dst_size, dst_size))
         return warped, M
@@ -102,21 +108,41 @@ def perspective_correct(image: np.ndarray, src_points: Optional[np.ndarray] = No
         approx = cv2.approxPolyDP(cnt, 0.02 * peri, True)
         if len(approx) == 4 and cv2.contourArea(cnt) > (h * w * 0.02):
             src = _order_points(approx.reshape(4, 2).astype("float32"))
-            dst = np.array([[0, 0], [dst_size - 1, 0], [dst_size - 1, dst_size - 1], [0, dst_size - 1]], dtype="float32")
+            dst = np.array(
+                [[0, 0], [dst_size - 1, 0], [dst_size - 1, dst_size - 1], [0, dst_size - 1]],
+                dtype="float32",
+            )
             M = cv2.getPerspectiveTransform(src, dst)
             warped = cv2.warpPerspective(image, M, (dst_size, dst_size))
             return warped, M
     return image, None
 
 
-def detect_circle(image: np.ndarray, dp: float = 1.2, min_dist: float = 100, param1: float = 100, param2: float = 30, min_r: int = 40, max_r: int = 200) -> Optional[Tuple[int, int, int]]:
+def detect_circle(
+    image: np.ndarray,
+    dp: float = 1.2,
+    min_dist: float = 100,
+    param1: float = 100,
+    param2: float = 30,
+    min_r: int = 40,
+    max_r: int = 200,
+) -> Optional[Tuple[int, int, int]]:
     """Detect dominant circle via HoughCircles. Returns (cx, cy, r) or None."""
     if not _HAS_CV2:
         return None
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if image.ndim == 3 else image
     gray = cv2.medianBlur(gray, 5)
     gray = cv2.GaussianBlur(gray, (9, 9), 2)
-    circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, dp=dp, minDist=min_dist, param1=param1, param2=param2, minRadius=min_r, maxRadius=max_r)
+    circles = cv2.HoughCircles(
+        gray,
+        cv2.HOUGH_GRADIENT,
+        dp=dp,
+        minDist=min_dist,
+        param1=param1,
+        param2=param2,
+        minRadius=min_r,
+        maxRadius=max_r,
+    )
     if circles is None:
         return None
     circles = np.round(circles[0, :]).astype(int)
@@ -125,7 +151,7 @@ def detect_circle(image: np.ndarray, dp: float = 1.2, min_dist: float = 100, par
     center = np.array([w / 2, h / 2])
     best = None
     best_score = -1
-    for (x, y, r) in circles:
+    for x, y, r in circles:
         # score: large radius + near center
         dist = np.linalg.norm(np.array([x, y]) - center)
         score = r - dist * 0.5
@@ -159,10 +185,24 @@ def detect_needle_angle(image: np.ndarray, center: Tuple[int, int], radius: int)
     edges = cv2.bitwise_and(edges, edges, mask=inner_mask)
 
     # HoughLinesP
-    lines = cv2.HoughLinesP(edges, rho=1, theta=np.pi / 180, threshold=30, minLineLength=int(radius * 0.4), maxLineGap=10)
+    lines = cv2.HoughLinesP(
+        edges,
+        rho=1,
+        theta=np.pi / 180,
+        threshold=30,
+        minLineLength=int(radius * 0.4),
+        maxLineGap=10,
+    )
     if lines is None or len(lines) == 0:
         # fallback: use probabilistic Hough with lower threshold
-        lines = cv2.HoughLinesP(edges, rho=1, theta=np.pi / 180, threshold=20, minLineLength=int(radius * 0.3), maxLineGap=8)
+        lines = cv2.HoughLinesP(
+            edges,
+            rho=1,
+            theta=np.pi / 180,
+            threshold=20,
+            minLineLength=int(radius * 0.3),
+            maxLineGap=8,
+        )
         if lines is None:
             return None
 
@@ -216,7 +256,9 @@ def detect_needle_angle(image: np.ndarray, center: Tuple[int, int], radius: int)
     return None
 
 
-def _fallback_angle_from_contour(image: np.ndarray, center: Tuple[int, int], radius: int) -> Optional[float]:
+def _fallback_angle_from_contour(
+    image: np.ndarray, center: Tuple[int, int], radius: int
+) -> Optional[float]:
     """Fallback: find needle as largest contour inside gauge that is elongated."""
     if not _HAS_CV2:
         return None
@@ -269,7 +311,9 @@ def analyze_gauge_image(
     if not _HAS_CV2:
         # synthetic without cv2: deterministic pseudo value
         h = abs(hash(image.tobytes()[:64])) % 1000 if image.size else 0
-        val = calibration.min_value + (h % 100) / 100.0 * (calibration.max_value - calibration.min_value)
+        val = calibration.min_value + (h % 100) / 100.0 * (
+            calibration.max_value - calibration.min_value
+        )
         return val, 0.35, None, {"reason": "opencv not installed — synthetic"}
 
     gp = gauge_params or {}
@@ -281,14 +325,26 @@ def analyze_gauge_image(
     min_r, max_r = int(r_range[0]), int(r_range[1])
 
     # 1) perspective
-    warped, M = perspective_correct(image, src_points=src_points, dst_size=int(gp.get("dst_size", 400)))
+    warped, M = perspective_correct(
+        image, src_points=src_points, dst_size=int(gp.get("dst_size", 400))
+    )
 
     # 2) circle
-    circle = detect_circle(warped, dp=dp, min_dist=min_dist, param1=param1, param2=param2, min_r=min_r, max_r=max_r)
+    circle = detect_circle(
+        warped, dp=dp, min_dist=min_dist, param1=param1, param2=param2, min_r=min_r, max_r=max_r
+    )
     if circle is None:
         # try on original if warped failed
         if warped is not image:
-            circle = detect_circle(image, dp=dp, min_dist=min_dist, param1=param1, param2=param2, min_r=min_r, max_r=max_r)
+            circle = detect_circle(
+                image,
+                dp=dp,
+                min_dist=min_dist,
+                param1=param1,
+                param2=param2,
+                min_r=min_r,
+                max_r=max_r,
+            )
             if circle:
                 warped = image
         if circle is None:
@@ -314,7 +370,12 @@ def analyze_gauge_image(
     if r < 30:
         conf *= 0.7
 
-    debug = {"circle": circle, "angle": angle, "has_warp": M is not None, "warped_shape": warped.shape[:2]}
+    debug = {
+        "circle": circle,
+        "angle": angle,
+        "has_warp": M is not None,
+        "warped_shape": warped.shape[:2],
+    }
     return value, conf, angle, debug
 
 
@@ -490,14 +551,18 @@ class CameraAdapter(BaseAdapter):
 
         if frame is None:
             # synthetic fallback — still produce a reading so pipeline not starved
-            return self._synthetic_reading(metric, unit, source_tag, reason="no frame — synthetic fallback")
+            return self._synthetic_reading(
+                metric, unit, source_tag, reason="no frame — synthetic fallback"
+            )
 
         # run pipeline in thread (CPU-heavy)
         gauge_params = self.config.params.get("gauge", {})
         calibration = self.calibration
 
         def _analyze():
-            return analyze_gauge_image(frame, calibration, src_points=self.src_points, gauge_params=gauge_params)
+            return analyze_gauge_image(
+                frame, calibration, src_points=self.src_points, gauge_params=gauge_params
+            )
 
         try:
             value, confidence, angle, debug = await asyncio.to_thread(_analyze)
@@ -510,7 +575,9 @@ class CameraAdapter(BaseAdapter):
             self._last_error = f"gauge detection failed: {debug}"
             # return uncertain synthetic but mark degraded
             self._status = "degraded"
-            return self._synthetic_reading(metric, unit, source_tag, reason="detection failed — synthetic fallback")
+            return self._synthetic_reading(
+                metric, unit, source_tag, reason="detection failed — synthetic fallback"
+            )
 
         # apply tag scale/offset if tag has them
         if self.config.tags:
@@ -522,7 +589,11 @@ class CameraAdapter(BaseAdapter):
                 pass
 
         # quality from confidence
-        quality = Quality.GOOD if confidence >= 0.7 else (Quality.UNCERTAIN if confidence >= 0.4 else Quality.BAD)
+        quality = (
+            Quality.GOOD
+            if confidence >= 0.7
+            else (Quality.UNCERTAIN if confidence >= 0.4 else Quality.BAD)
+        )
         self._last_value = value
         self._last_ok_ts = time.time()
         self._status = "ok"
@@ -542,8 +613,11 @@ class CameraAdapter(BaseAdapter):
         )
         return [reading]
 
-    def _synthetic_reading(self, metric: str, unit: str, source_tag: str, reason: str = "") -> List[NormalizedReading]:
-        import math, random
+    def _synthetic_reading(
+        self, metric: str, unit: str, source_tag: str, reason: str = ""
+    ) -> List[NormalizedReading]:
+        import math
+        import random
 
         # deterministic-ish synthetic that still varies
         t = time.time()

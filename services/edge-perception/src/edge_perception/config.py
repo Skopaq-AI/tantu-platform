@@ -90,7 +90,11 @@ class Settings(BaseSettings):
     redis_url: str = Field(default="redis://localhost:6379/0")
     redis_stream: str = Field(default="tantu:edge:readings")
     redis_max_buffer: int = Field(default=10000)
-    jwt_secret: str = Field(default_factory=lambda: os.getenv("JWT_SECRET", os.getenv("JWT_PRIVATE_KEY", "dev-only-key-replace-in-prod")))
+    jwt_secret: str = Field(
+        default_factory=lambda: os.getenv(
+            "JWT_SECRET", os.getenv("JWT_PRIVATE_KEY", "dev-only-key-replace-in-prod")
+        )
+    )
     jwt_algorithm: str = Field(default="HS256")
     ota_public_key_path: str = Field(default="")
     ota_current_version: str = Field(default="0.1.0")

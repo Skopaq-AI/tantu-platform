@@ -1,4 +1,5 @@
 """Shared dependencies."""
+
 from ..application.registry import AdapterRegistry
 from ..infra.nats import NatsPublisher, get_publisher
 

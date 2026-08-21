@@ -1,4 +1,5 @@
 """Orchestrator configuration — 12-factor."""
+
 from __future__ import annotations
 
 import os

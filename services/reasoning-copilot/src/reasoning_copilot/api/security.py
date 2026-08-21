@@ -1,4 +1,5 @@
 """JWT + RBAC/ABAC — HS256 (RS256-ready) + dev fallback."""
+
 from __future__ import annotations
 
 import time
@@ -14,7 +15,13 @@ ALG = "HS256"
 
 def issue_jwt(sub: str, plant_id: str, role: str = "operator", exp_min: int = 60) -> str:
     now = int(time.time())
-    payload = {"sub": sub, "plant_id": plant_id, "role": role, "iat": now, "exp": now + exp_min * 60}
+    payload = {
+        "sub": sub,
+        "plant_id": plant_id,
+        "role": role,
+        "iat": now,
+        "exp": now + exp_min * 60,
+    }
     return jwt.encode(payload, settings.jwt_secret, algorithm=ALG)
 
 

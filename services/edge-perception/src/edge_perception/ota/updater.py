@@ -93,12 +93,17 @@ class OTAUpdater:
         if not self.state_path:
             return
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
-        self.state_path.write_text(json.dumps({
-            "current_version": self.current_version,
-            "previous_version": self.previous_version,
-            "state": self.state.value,
-            "ts": time.time(),
-        }, indent=2))
+        self.state_path.write_text(
+            json.dumps(
+                {
+                    "current_version": self.current_version,
+                    "previous_version": self.previous_version,
+                    "state": self.state.value,
+                    "ts": time.time(),
+                },
+                indent=2,
+            )
+        )
 
     def _verify_sha256(self, data: bytes, expected_hex: str) -> bool:
         got = hashlib.sha256(data).hexdigest()
@@ -129,7 +134,9 @@ class OTAUpdater:
                 return False
         # HMAC fallback
         if self.hmac_secret:
-            expected = hmac.new(self.hmac_secret.encode(), sha_hex.encode(), hashlib.sha256).digest()
+            expected = hmac.new(
+                self.hmac_secret.encode(), sha_hex.encode(), hashlib.sha256
+            ).digest()
             try:
                 got = base64.b64decode(sig_b64)
             except Exception:
@@ -160,23 +167,31 @@ class OTAUpdater:
             assert data is not None
             self.state = OTAState.VERIFYING
             if not self._verify_sha256(data, pkg.sha256):
-                raise ValueError(f"sha256 mismatch: expected {pkg.sha256}, got {hashlib.sha256(data).hexdigest()}")
+                raise ValueError(
+                    f"sha256 mismatch: expected {pkg.sha256}, got {hashlib.sha256(data).hexdigest()}"
+                )
             if pkg.signature_b64 and not self._verify_signature(pkg.sha256, pkg.signature_b64):
                 raise ValueError("signature verification failed")
             if not _is_newer(pkg.version, self.current_version):
-                raise ValueError(f"version {pkg.version!r} is not newer than current {self.current_version!r} (monotonic)")
+                raise ValueError(
+                    f"version {pkg.version!r} is not newer than current {self.current_version!r} (monotonic)"
+                )
 
             self.state = OTAState.STAGING
             # staging would write to A/B partition — here we just retain
             self.staged = pkg
             self.state = OTAState.READY
             self._persist()
-            self.history.append({"version": pkg.version, "state": self.state.value, "ts": time.time()})
+            self.history.append(
+                {"version": pkg.version, "state": self.state.value, "ts": time.time()}
+            )
             return {"status": "ready_to_apply", "version": pkg.version, "sha256": pkg.sha256}
         except Exception as e:
             self.state = OTAState.FAILED
             self.last_error = str(e)
-            self.history.append({"version": pkg.version, "state": "failed", "error": str(e), "ts": time.time()})
+            self.history.append(
+                {"version": pkg.version, "state": "failed", "error": str(e), "ts": time.time()}
+            )
             self._persist()
             raise
 
@@ -202,7 +217,9 @@ class OTAUpdater:
         self.state = OTAState.ROLLED_BACK
         self.staged = None
         self._persist()
-        self.history.append({"version": self.current_version, "state": "rolled_back", "ts": time.time()})
+        self.history.append(
+            {"version": self.current_version, "state": "rolled_back", "ts": time.time()}
+        )
         return {"status": "rolled_back", "version": self.current_version, "previous": cur}
 
     def status(self) -> dict:

@@ -5,13 +5,14 @@ Fallback: HS256 using JWT_PRIVATE_KEY when RS256 not configured — logs warning
 
 Also provides token issuance for dev/tests and FastAPI dependencies.
 """
+
 from __future__ import annotations
 
 import time
 import logging
 from typing import Optional, Any
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Header, HTTPException, status
 from jose import jwt, JWTError
 from pydantic import BaseModel
 
@@ -20,6 +21,7 @@ from .config import settings
 log = logging.getLogger("gateway.security")
 
 # ── Key handling ─────────────────────────────────────────────────────
+
 
 def _normalize_pem(pem: str) -> str:
     """Support escaped newlines (env var with \\n)."""
@@ -46,7 +48,10 @@ def _load_verify_keys() -> tuple[str, str, str]:
         try:
             from cryptography.hazmat.primitives import serialization
             from cryptography.hazmat.backends import default_backend
-            private_key = serialization.load_pem_private_key(priv.encode(), password=None, backend=default_backend())
+
+            private_key = serialization.load_pem_private_key(
+                priv.encode(), password=None, backend=default_backend()
+            )
             public_key = private_key.public_key()
             pub_derived = public_key.public_bytes(
                 encoding=serialization.Encoding.PEM,
@@ -74,12 +79,14 @@ def _load_verify_keys() -> tuple[str, str, str]:
 
 _ALG, _VERIFY_KEY, _SIGN_KEY = _load_verify_keys()
 
+
 # For test convenience: allow resetting keys at runtime
 def _get_verify_state() -> tuple[str, str, str]:
     return _load_verify_keys()
 
 
 # ── JWT issue / verify ───────────────────────────────────────────────
+
 
 def issue_jwt(
     sub: str,
@@ -148,6 +155,7 @@ def verify_jwt(token: str) -> dict[str, Any]:
 
 # ── Pydantic models ──────────────────────────────────────────────────
 
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "Bearer"
@@ -155,6 +163,7 @@ class TokenResponse(BaseModel):
 
 
 # ── FastAPI dependencies ─────────────────────────────────────────────
+
 
 async def require_auth(authorization: Optional[str] = Header(None)) -> dict[str, Any]:
     """Mandatory auth — 401 if missing/invalid. Returns claims."""
@@ -166,9 +175,14 @@ async def require_auth(authorization: Optional[str] = Header(None)) -> dict[str,
     try:
         claims = verify_jwt(token)
     except JWTError as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Invalid token: {e}") from e
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Invalid token: {e}"
+        ) from e
     if "sub" not in claims or "plant_id" not in claims or "role" not in claims:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token missing required claims (sub/plant_id/role)")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token missing required claims (sub/plant_id/role)",
+        )
     # exp validated by jose
     return claims
 

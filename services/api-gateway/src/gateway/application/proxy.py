@@ -1,4 +1,5 @@
 """Proxy service — maps incoming /api paths to downstream bases."""
+
 from __future__ import annotations
 
 from typing import Optional
