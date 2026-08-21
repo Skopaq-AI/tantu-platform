@@ -50,7 +50,8 @@ jobs:
             echo "env=dev" >> $GITHUB_OUTPUT
           fi
       - uses: hashicorp/setup-terraform@v3
-        with: { terraform_version: ${{ env.TF_VERSION }} }
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
       - run: terraform -chdir=terraform fmt -check || (terraform -chdir=terraform fmt -diff && exit 1)
       - id: gcp-auth
         uses: google-github-actions/auth@v2
@@ -74,7 +75,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
-        with: { terraform_version: ${{ env.TF_VERSION }} }
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
       - uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WIP }}
