@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.12...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.13...v) (2026-08-21)
+
+
+### Bug Fixes
+
+* **gateway:** HTTPRoute hostnames add 8.233.79.240 so http://8.233.79.240/ 200 not 404 fault filter abort ([a6dbfc0](https://github.com/Skopaq-AI/tantu-platform/commit/a6dbfc07f524e6b6bc4261fb8194b288c73ea8aa))
+
+## [0.3.13](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.12...v0.3.13) (2026-08-21)
 
 
 ### Bug Fixes
