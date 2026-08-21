@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.3...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.4...v) (2026-08-21)
+
+
+### Bug Fixes
+
+* **ci:** infra workflow yaml — flow mapping with expression caused 0 jobs failure ([8b31431](https://github.com/Skopaq-AI/tantu-platform/commit/8b31431020af64a1d7f5cbada1b8bb8a6011b58a))
+
+## [0.3.4](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.3...v0.3.4) (2026-08-21)
 
 
 ### Bug Fixes
