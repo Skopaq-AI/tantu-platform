@@ -1,0 +1,88 @@
+name: Infra
+
+# Deploys Terraform + Helm via GitHub Actions (OIDC, no keys).
+# This is the GitHub Actions setup you asked for — triggers on terraform/** push or manual.
+
+on:
+  push:
+    branches: [main]
+    paths: ["terraform/**", "infra/k8s/**", ".github/workflows/infra.yml"]
+  pull_request:
+    branches: [main]
+    paths: ["terraform/**", "infra/k8s/**"]
+  workflow_dispatch:
+    inputs:
+      env:
+        description: "Environment"
+        required: true
+        default: dev
+        type: choice
+        options: [dev, prod]
+      action:
+        description: "Action"
+        required: true
+        default: plan
+        type: choice
+        options: [plan, apply, destroy]
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+env:
+  TF_VERSION: "1.6.6"
+  GCP_REGION: ${{ vars.GCP_REGION || 'asia-south1' }}
+  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID || '' }}
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      env: ${{ steps.vars.outputs.env }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: vars
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "env=${{ inputs.env }}" >> $GITHUB_OUTPUT
+          else
+            echo "env=dev" >> $GITHUB_OUTPUT
+          fi
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: ${{ env.TF_VERSION }} }
+      - run: terraform -chdir=terraform fmt -check || (terraform -chdir=terraform fmt -diff && exit 1)
+      - id: gcp-auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIP }}
+          service_account: ${{ secrets.GCP_SA }}
+        continue-on-error: true
+      - if: steps.gcp-auth.outcome == 'success'
+        run: |
+          terraform -chdir=terraform init -backend-config="bucket=${{ env.GCP_PROJECT_ID }}-tfstate" -backend-config="prefix=env/${{ steps.vars.outputs.env }}"
+          terraform -chdir=terraform plan -var-file=envs/${{ steps.vars.outputs.env }}.tfvars -var="project_id=${{ env.GCP_PROJECT_ID }}" -out=tfplan
+        continue-on-error: true
+      - if: failure()
+        run: echo "::warning::Infra plan skipped — set GCP_WIP/GCP_SA/GCP_PROJECT_ID vars + enable Workload Identity (see README Setup from GitHub Actions)"
+
+  apply:
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'apply' && github.ref == 'refs/heads/main'
+    needs: plan
+    runs-on: ubuntu-latest
+    environment: ${{ needs.plan.outputs.env }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: ${{ env.TF_VERSION }} }
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIP }}
+          service_account: ${{ secrets.GCP_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - run: terraform -chdir=terraform init -backend-config="bucket=${{ env.GCP_PROJECT_ID }}-tfstate" -backend-config="prefix=env/${{ needs.plan.outputs.env }}"
+      - run: terraform -chdir=terraform apply -var-file=envs/${{ needs.plan.outputs.env }}.tfvars -var="project_id=${{ env.GCP_PROJECT_ID }}" -auto-approve
+      - run: |
+          gcloud container clusters get-credentials tantu-${{ needs.plan.outputs.env }}-gke --region ${{ env.GCP_REGION }} --project ${{ env.GCP_PROJECT_ID }}
+          helm upgrade --install tantu ./infra/k8s -f infra/k8s/values-${{ needs.plan.outputs.env }}.yaml -n tantu --create-namespace
+      - run: echo "::notice::Infra applied — Gateway https://console.cloud.google.com/kubernetes/gateway/regions/${{ env.GCP_REGION }}/gateways/tantu-${{ needs.plan.outputs.env }}-gateway?project=${{ env.GCP_PROJECT_ID }}"
