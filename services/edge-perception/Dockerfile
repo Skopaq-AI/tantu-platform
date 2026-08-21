@@ -89,3 +89,6 @@ RUN pip install --upgrade pip && pip install -e .
 EXPOSE 8002
 HEALTHCHECK --interval=10s --timeout=3s --retries=5 CMD curl -fsS http://localhost:8002/health || exit 1
 CMD ["uvicorn", "edge_perception.api.main:app", "--host", "0.0.0.0", "--port", "8002"]
+
+# ── Final default stage (cloud/CI) — makes `docker build` without --target use base
+FROM base AS final
