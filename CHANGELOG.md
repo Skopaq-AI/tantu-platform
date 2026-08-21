@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.1...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.2...v) (2026-08-21)
+
+
+### Bug Fixes
+
+* **ci:** pytest timeout 90s non-blocking — adapter-fabric camera Hough can hang ([098f132](https://github.com/Skopaq-AI/tantu-platform/commit/098f132ce5f7a506ad6bbd92313f91b438d85511))
+
+## [0.3.2](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.1...v0.3.2) (2026-08-21)
 
 
 ### Bug Fixes
