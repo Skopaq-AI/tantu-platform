@@ -1,4 +1,12 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.11...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.12...v) (2026-08-21)
+
+
+### Bug Fixes
+
+* **cloudbuild:** remove unused _ENV substitution — was INVALID_ARGUMENT key _ENV not matched ([ae18649](https://github.com/Skopaq-AI/tantu-platform/commit/ae18649ab0cd85f4863a33ca8eb8db4c08c317a8))
+* **helm/gateway:** correct static IP for serving + template fixes ([52ab1eb](https://github.com/Skopaq-AI/tantu-platform/commit/52ab1eb914c9d1444975fd9eda44c5df34d2ec1b))
+
+## [0.3.12](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.11...v0.3.12) (2026-08-21)
 
 
 ### Bug Fixes
