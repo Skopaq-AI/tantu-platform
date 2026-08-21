@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn, protocolColor } from "@/lib/utils";
 import { askCopilot, ackEvent, DefectEvent, getSSEUrl } from "@/lib/api";
 import { FFTChart, WalkTrendChart } from "@/components/charts/FFTChart";
+import { RoleGuard } from "@/components/RoleGuard";
 import { LayoutGrid, Activity, AlertTriangle, Check, Search, Filter, Radio, Sparkles, Copy } from "lucide-react";
 
 export default function MaintenancePage() {
@@ -88,6 +89,7 @@ export default function MaintenancePage() {
   };
 
   return (
+    <RoleGuard allowedRoles={["MAINTENANCE","MAINTENANCE_TECH","MAINTENANCE_LEAD","MAINTENANCE_MANAGER","ORG_ADMIN","OWNER"]}>
     <div className="px-4 sm:px-6 py-6 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold flex items-center gap-2"><LayoutGrid className="h-5 w-5 text-sky-600" /> {t("maintenance", lang)} <Badge variant="sky">One schema, mixed fleet</Badge></h1>
@@ -231,5 +233,6 @@ export default function MaintenancePage() {
         )}
       </Dialog>
     </div>
+    </RoleGuard>
   );
 }

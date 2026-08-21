@@ -11,6 +11,7 @@ import { toast } from "@/lib/toast";
 import { Gauge, TrendingDown, Clock, Shield, Banknote, Calendar, ArrowUpRight, Check, FileText, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { motion } from "@/lib/motion";
+import { RoleGuard } from "@/components/RoleGuard";
 
 export default function PlantHeadPage() {
   const { lang } = useI18n();
@@ -27,6 +28,7 @@ export default function PlantHeadPage() {
   }, []);
 
   return (
+    <RoleGuard allowedRoles={["PLANT_HEAD","ORG_ADMIN","OWNER"]}>
     <div className="px-4 sm:px-6 py-6 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold flex items-center gap-2"><Gauge className="h-5 w-5 text-emerald-600" /> {t("plant_head", lang)} <Badge variant="emerald">{t("opex_title", lang)}</Badge></h1>
@@ -170,5 +172,6 @@ export default function PlantHeadPage() {
         <Badge variant="secondary" className="bg-white text-slate-900 dark:bg-slate-900 dark:text-white">Auditable · SOC2-ready</Badge>
       </div>
     </div>
+    </RoleGuard>
   );
 }

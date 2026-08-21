@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ackEvent } from "@/lib/api";
+import { RoleGuard } from "@/components/RoleGuard";
 import { Mic, MicOff, Volume2, Check, AlertTriangle, Wifi, Hand, Sparkles, Activity } from "lucide-react";
 
 type Alert = { station_id: string; defect_class: string; confidence: number; latency_ms: number; protocol: string; ts: number };
@@ -78,6 +79,7 @@ export default function OperatorPage() {
   }
 
   return (
+    <RoleGuard allowedRoles={["OPERATOR","ORG_ADMIN","OWNER"]}>
     <div className="px-4 sm:px-6 py-6 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold flex items-center gap-2"><Mic className="h-5 w-5 text-amber-600" /> {t("operator", lang)} <Badge variant="amber">Voice-first</Badge></h1>
@@ -197,5 +199,6 @@ export default function OperatorPage() {
 
       <div className="text-[11px] text-slate-400 text-center">Operator view optimized for 85 dB, gloves, 12-hour shifts · One-button ack is telemetry only (not auth) · Audio via Web Speech API (SpeechRecognition + speechSynthesis) · a11y: keyboard, focus ring, aria</div>
     </div>
+    </RoleGuard>
   );
 }
