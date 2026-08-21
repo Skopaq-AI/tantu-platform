@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.2.0...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.3.0...v) (2026-08-21)
+
+
+### Bug Fixes
+
+* **ci:** revert shiksha-os-dev references to dedicated beta project tantu-beta-20260821-01 + stabilize CI ([0ce4487](https://github.com/Skopaq-AI/tantu-platform/commit/0ce448706ad607f547294cd5607944f0609454b8))
+
+# [0.3.0](https://github.com/Skopaq-AI/tantu-platform/compare/v0.2.0...v0.3.0) (2026-08-21)
 
 
 ### Features
