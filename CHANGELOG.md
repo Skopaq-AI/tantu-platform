@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.7.1...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.7.2...v) (2026-08-21)
+
+
+### Features
+
+* **prod:** persistence, discovery, edge accel, VLLM — no stubs ([d770e03](https://github.com/Skopaq-AI/tantu-platform/commit/d770e03d2bf9899299c280cbc398476352e01d01))
+
+## [0.7.2](https://github.com/Skopaq-AI/tantu-platform/compare/v0.7.1...v0.7.2) (2026-08-21)
 
 
 ### Bug Fixes
