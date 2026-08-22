@@ -113,7 +113,11 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 @app.get("/health")
 async def health_ep():
     snap = health.snapshot()
-    # refresh store-forward status
+    # refresh store-forward status — ensure redis is checked live, not stale
+    try:
+        await sf._ensure_redis()
+    except Exception:
+        pass
     snap["components"]["store_forward"] = {
         "status": "ok" if sf.status()["redis_ok"] else "degraded",
         "details": sf.status(),
