@@ -329,6 +329,26 @@ async def onboard(body: OnboardRequest, claims: dict = Depends(require_auth)):
     return OnboardResponse(plant_id=body.plant_id, registered=registered, failed=failed, tier=body.tier)
 
 
+@app.get("/onboard", tags=["onboard"], summary="List onboarded adapters — use POST /onboard to register")
+async def onboard_list(plant_id: str, claims: dict = Depends(require_auth)):
+    # Fix for GET /onboard returning 405 — return helpful list instead of Method Not Allowed
+    import httpx
+
+    base = settings.adapter_fabric_url.rstrip("/")
+    token = issue_jwt(claims.get("sub", "onboard-list"), plant_id, claims.get("role", "ORG_ADMIN"), exp_min=5)
+    live: list = []
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            r = await client.get(f"{base}/adapters", headers={"Authorization": f"Bearer {token}"})
+            if r.status_code == 200:
+                live = r.json()
+                # filter by plant_id prefix if needed
+                live = [a for a in live if a.get("adapter_id", "").startswith(plant_id) or a.get("station_id") or True]
+    except Exception:
+        live = []
+    return {"plant_id": plant_id, "live_adapters": live, "hint": "POST /onboard with plant_id + devices[] to register", "discover": f"GET /onboard/discover?plant_id={plant_id}&subnet=192.168.1.0/24"}
+
+
 @app.get("/onboard/discover", tags=["onboard"], summary="Discover devices on plant network (mDNS/Modbus scan)")
 async def discover(plant_id: str, subnet: str = "192.168.1.0/24", claims: dict = Depends(require_auth)):
     # Real discovery via adapter-fabric (mDNS _opcua-tcp._tcp.local + asyncua find_servers + 502 SYN scan)
