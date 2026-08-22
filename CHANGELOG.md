@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.9.1...v) (2026-08-22)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.9.2...v) (2026-08-22)
+
+
+### Bug Fixes
+
+* **edge:** health now ensures redis connection live before reporting degraded ([a9fb482](https://github.com/Skopaq-AI/tantu-platform/commit/a9fb48223b865a6decbbf1f674ff0060e20ff577))
+
+## [0.9.2](https://github.com/Skopaq-AI/tantu-platform/compare/v0.9.1...v0.9.2) (2026-08-22)
 
 
 ### Bug Fixes

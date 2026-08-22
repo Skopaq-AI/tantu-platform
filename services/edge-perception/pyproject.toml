@@ -1,6 +1,6 @@
 [project]
 name = "edge-perception"
-version = "0.9.2"
+version = "0.9.3"
 description = "TANTU Edge Perception — tiered offline-first inference (gauge CV + vibration FFT + thermal + CT-clamp) — FastAPI on 8002"
 readme = "README.md"
 requires-python = ">=3.11"
