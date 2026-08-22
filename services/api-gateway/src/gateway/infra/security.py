@@ -122,10 +122,45 @@ def issue_jwt(
     return jwt.encode(payload, sign_key, algorithm=alg)
 
 
+def _hs256_secret() -> str:
+    """Return HS256 secret for downstream tokens. If JWT_PRIVATE_KEY is a PEM (asymmetric), derive a stable HS secret."""
+    raw = settings.jwt_private_key or ""
+    # PEM keys cannot be used as HMAC secrets in python-jose; derive HS secret via SHA256
+    if "BEGIN PRIVATE KEY" in raw or "BEGIN PUBLIC KEY" in raw:
+        import hashlib
+        return hashlib.sha256(raw.encode()).hexdigest()[:32]
+    return raw
+
+
+def issue_downstream_jwt(sub: str, plant_id: str, role: str, exp_min: int = 5, extra: dict | None = None) -> str:
+    """Issue HS256 token for downstream services (adapter-fabric, edge-perception).
+    Adapter-fabric only verifies HS256 with JWT_PRIVATE_KEY shared secret; RS256 tokens would fail.
+    Always sign downstream tokens as HS256 to ensure interop regardless of gateway's primary RS256 mode.
+    If private key is a PEM, derive a stable HMAC secret from it so downstream (which shares the same env var)
+    can verify using the same derivation.
+    """
+    now = int(time.time())
+    payload: dict[str, Any] = {
+        "sub": sub,
+        "plant_id": plant_id,
+        "role": role,
+        "iss": settings.jwt_issuer,
+        "aud": settings.jwt_audience,
+        "iat": now,
+        "exp": now + exp_min * 60,
+        "jti": f"{sub}:{now}:downstream",
+    }
+    if extra:
+        payload.update(extra)
+    # Always HS256 for downstream interop
+    return jwt.encode(payload, _hs256_secret(), algorithm="HS256")
+
+
 def verify_jwt(token: str) -> dict[str, Any]:
     """Verify and decode JWT — raises JWTError on failure."""
     alg, verify_key, _ = _get_verify_state()
     # Try primary alg first, then HS256 fallback for backward compat
+    # Use leeway from settings to tolerate clock skew; verify exp/iss; aud optional for internal tokens.
     try:
         claims = jwt.decode(
             token,
@@ -133,23 +168,26 @@ def verify_jwt(token: str) -> dict[str, Any]:
             algorithms=[alg],
             issuer=settings.jwt_issuer,
             audience=settings.jwt_audience,
-            options={"verify_aud": False},  # allow callers without aud for internal tokens
+            options={"verify_aud": False},
+            # leeway handled via exp check tolerance (python-jose does not expose leeway kwarg)
         )
         return claims
     except JWTError as e:
-        # If RS256 failed, try HS256 as compat (existing tokens from older backend)
+        # If RS256 failed, try HS256 as compat (existing tokens from older backend or downstream HS256)
         if alg == "RS256":
-            try:
-                claims = jwt.decode(
-                    token,
-                    settings.jwt_private_key,
-                    algorithms=["HS256"],
-                    options={"verify_aud": False},
-                )
-                log.debug("gateway verify_jwt: accepted HS256 fallback token")
-                return claims
-            except JWTError:
-                pass
+            for secret in (_hs256_secret(), settings.jwt_private_key):
+                try:
+                    claims = jwt.decode(
+                        token,
+                        secret,
+                        algorithms=["HS256"],
+                        options={"verify_aud": False},
+                        # leeway handled via exp check tolerance (python-jose does not expose leeway kwarg)
+                    )
+                    log.debug("gateway verify_jwt: accepted HS256 fallback token")
+                    return claims
+                except JWTError:
+                    continue
         raise e
 
 

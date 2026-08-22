@@ -36,12 +36,47 @@ function canAccess(pathname: string, role: string): boolean {
   return true;
 }
 
+function roleToDashboard(role: string): string {
+  const r = (role || "").toUpperCase();
+  if (r === "OPERATOR") return "/operator";
+  if (r.startsWith("MAINTENANCE") || r === "MAINTENANCE") return "/maintenance";
+  if (r === "PLANT_HEAD") return "/plant-head";
+  if (r === "ORG_ADMIN" || r === "OWNER" || r === "ADMIN") return "/admin/users";
+  // fallback for unknown privileged roles
+  if (r) return "/operator";
+  return "/login";
+}
+
 export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
-  // public routes — always allow
+  // handle root "/" — redirect to role dashboard when authenticated, else show landing
+  if (pathname === "/") {
+    const token =
+      request.cookies.get("tantu_access")?.value ||
+      request.cookies.get("access_token")?.value ||
+      request.cookies.get("token")?.value ||
+      null;
+    if (token) {
+      const payload = decodePayload(token);
+      if (payload) {
+        // check not expired
+        if (!(payload.exp && payload.exp * 1000 < Date.now() - 5_000)) {
+          const role = (payload.role || payload.Role || "") as string;
+          const dest = roleToDashboard(role);
+          const url = request.nextUrl.clone();
+          url.pathname = dest;
+          // preserve search? typically not needed for root
+          return NextResponse.redirect(url);
+        }
+      }
+    }
+    // check refresh token present — let client refresh; do not redirect blindly
+    return NextResponse.next();
+  }
+
+  // public routes — always allow (except root handled above)
   if (
-    pathname === "/" ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/signup") ||
     pathname.startsWith("/invite") ||

@@ -102,13 +102,16 @@ def _config_to_row(cfg: AdapterConfig) -> AdapterConfigRow:
 # ---------------------------------------------------------------------------
 
 async def save_adapter_config(cfg: AdapterConfig) -> bool:
-    """Upsert one AdapterConfig. Returns True if persisted, False if DB down."""
-    # try postgres first
+    """Dual-write AdapterConfig to Postgres and Redis tantu:adapters.
+
+    Both writes are best-effort but attempted regardless of the other's
+    outcome, so a transient PG outage still leaves Redis durable (and vice
+    versa). Returns True if at least one backend succeeded.
+    """
     pg_ok = False
     try:
         Session = get_sessionmaker()
         async with Session() as session:
-            # merge does upsert on PK
             row = _config_to_row(cfg)
             await session.merge(row)
             await session.commit()
@@ -116,17 +119,22 @@ async def save_adapter_config(cfg: AdapterConfig) -> bool:
     except Exception as e:
         log.debug("save_adapter_config postgres skipped: %s", e)
         pg_ok = False
-    # also save to redis fallback (best-effort, always). If pg failed, redis is the durability.
+    # always attempt Redis dual-write even if PG succeeded — keeps tantu:adapters in sync
+    redis_ok = False
     try:
         redis_ok = await _redis_save(cfg)
-        return pg_ok or redis_ok
     except Exception as e:
-        log.debug("save_adapter_config redis fallback: %s", e)
-        return pg_ok
+        log.debug("save_adapter_config redis dual-write: %s", e)
+        redis_ok = False
+    if pg_ok and redis_ok:
+        log.debug("save_adapter_config dual-write ok: %s", cfg.adapter_id)
+    elif pg_ok or redis_ok:
+        log.debug("save_adapter_config partial write pg=%s redis=%s id=%s", pg_ok, redis_ok, cfg.adapter_id)
+    return pg_ok or redis_ok
 
 
 async def delete_adapter_config(adapter_id: str) -> bool:
-    """Delete one row. Returns True if attempted (or not found), False if DB down."""
+    """Delete from both Postgres and Redis tantu:adapters (dual-delete)."""
     pg_ok = False
     try:
         Session = get_sessionmaker()
@@ -137,27 +145,43 @@ async def delete_adapter_config(adapter_id: str) -> bool:
     except Exception as e:
         log.debug("delete_adapter_config postgres skipped: %s", e)
         pg_ok = False
-    # also delete from redis hash
+    # also delete from redis hash — always attempt even if PG failed
+    redis_ok = False
     try:
         r = _get_redis_client()
         if r is not None:
             await r.hdel("tantu:adapters", adapter_id)
-            await r.close()
-            return True
+            try:
+                if hasattr(r, "aclose"):
+                    await r.aclose()  # type: ignore
+                else:
+                    await r.close()  # type: ignore
+            except Exception:
+                pass
+            redis_ok = True
     except Exception as e:
-        log.debug("delete_adapter_config redis fallback: %s", e)
-    return pg_ok
+        log.debug("delete_adapter_config redis dual-delete: %s", e)
+    return pg_ok or redis_ok
 
 
 def _get_redis_client():  # type: ignore
+    """Return an async Redis client for dual-write hash tantu:adapters.
+
+    Honors REDIS_URL env (e.g. redis://10.30.0.3:6379/0 for real DB) and
+    settings.redis_url; falls back to in-cluster redis:6379 only when the
+    URL is missing or still a Secret Manager placeholder (REPLACE_ME).
+    The previous hardcoded check for 10.30.49.75 is removed — that was a
+    stale Memorystore IP and caused prod writes to be silently dropped.
+    """
     try:
         import os
 
         import redis.asyncio as aioredis  # type: ignore
 
-        url = os.environ.get("REDIS_URL", "redis://redis:6379/0")
-        # also fallback to secret-derived host if REDIS_URL missing
-        if not url or "REPLACE_ME" in url or "10.30.49.75" in url:
+        from .config import settings as _settings
+
+        url = os.environ.get("REDIS_URL") or getattr(_settings, "redis_url", "") or "redis://redis:6379/0"
+        if not url or "REPLACE_ME" in url:
             url = "redis://redis:6379/0"
         return aioredis.from_url(url, decode_responses=True)
     except Exception:
@@ -181,11 +205,16 @@ async def _redis_save(cfg: AdapterConfig) -> bool:
             "tags": _tags_to_json(cfg.tags),
         }
         await r.hset("tantu:adapters", cfg.adapter_id, json.dumps(payload))
-        # short expiry none — persist until delete
-        await r.close()
+        try:
+            if hasattr(r, "aclose"):
+                await r.aclose()  # type: ignore
+            else:
+                await r.close()  # type: ignore
+        except Exception:
+            pass
         return True
     except Exception as e:
-        log.debug("redis save fallback failed: %s", e)
+        log.debug("redis save dual-write failed: %s", e)
         return False
 
 
@@ -195,7 +224,13 @@ async def _redis_load() -> List[AdapterConfig]:
         if r is None:
             return []
         data = await r.hgetall("tantu:adapters")
-        await r.close()
+        try:
+            if hasattr(r, "aclose"):
+                await r.aclose()  # type: ignore
+            else:
+                await r.close()  # type: ignore
+        except Exception:
+            pass
         out: List[AdapterConfig] = []
         if not data:
             return []
@@ -237,7 +272,8 @@ async def load_adapter_configs() -> List[AdapterConfig]:
     """Load all persisted configs. Returns [] if DB unreachable.
 
     Tries Postgres first; if empty or unreachable, falls back to Redis
-    (in-cluster `redis:6379` — used when Secret Manager still has REPLACE_ME).
+    tantu:adapters hash. Dual-write keeps both backends in sync, so either
+    can be used for restore_from_db on startup.
     """
     # Try Postgres
     try:

@@ -1,4 +1,8 @@
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://8.233.79.240";
+
+export function isDemoEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_DEMO === "true";
+}
 
 // ---------- auth token helpers ----------
 // Reads access token from memory via localStorage + cookie sync.
@@ -157,14 +161,14 @@ export async function fetchHealth(): Promise<HealthResponse> {
   return safeFetch<HealthResponse>(`${API_URL}/health`, undefined, { status: "offline" });
 }
 
-/** GET /events?limit= */
+/** GET /events?limit= — demo fallback gated behind NEXT_PUBLIC_DEMO */
 export async function fetchEvents(limit = 20): Promise<DefectEvent[]> {
-  return safeFetch<DefectEvent[]>(`${API_URL}/events?limit=${limit}`, undefined, demoEvents().slice(0, limit));
+  const fallback = isDemoEnabled() ? demoEvents().slice(0, limit) : undefined;
+  return safeFetch<DefectEvent[]>(`${API_URL}/events?limit=${limit}`, undefined, fallback as any);
 }
 
-/** GET /poll — normalized telemetry poll (OPC-UA / Modbus / MQTT unified) */
+/** GET /poll — normalized telemetry poll (OPC-UA / Modbus / MQTT unified) — demo synthesis gated behind DEMO */
 export async function pollTelemetry(limit = 20): Promise<PollResponse> {
-  // try canonical /poll, fall back to /telemetry/poll or demo
   try {
     const r = await fetchWithAuth(`${API_URL}/poll?limit=${limit}`, { cache: "no-store" });
     if (r.ok) return (await r.json()) as PollResponse;
@@ -173,7 +177,8 @@ export async function pollTelemetry(limit = 20): Promise<PollResponse> {
     const r = await fetchWithAuth(`${API_URL}/telemetry/poll?limit=${limit}`, { cache: "no-store" });
     if (r.ok) return (await r.json()) as PollResponse;
   } catch {}
-  // fallback: synthesize from demo events as TelemetryReading
+  if (!isDemoEnabled()) throw new Error("poll telemetry unavailable");
+  // demo fallback: synthesize from demo events as TelemetryReading
   const evs = demoEvents().slice(0, limit);
   return {
     readings: evs.map((e) => ({
@@ -189,8 +194,16 @@ export async function pollTelemetry(limit = 20): Promise<PollResponse> {
   };
 }
 
-/** POST /ask — grounded RAG copilot */
+/** POST /ask — grounded RAG copilot — demo stub gated behind DEMO */
 export async function askCopilot(question: string, plant_id = "plant-demo-01", lang = "en"): Promise<AskResponse> {
+  const fallback = isDemoEnabled()
+    ? {
+        answer: `Grounded stub for '${question}' → check valve 3, bearing vibration up 12% in last 5 min (NATS: camera/thermal_high, source: tag-map line2).`,
+        vernacular: { en: "Check valve 3" },
+        sources: [{ id: "tag-map:line2", title: "Line 2 tag map" }],
+        grounded: true,
+      }
+    : undefined;
   return safeFetch<AskResponse>(
     `${API_URL}/ask`,
     {
@@ -198,12 +211,7 @@ export async function askCopilot(question: string, plant_id = "plant-demo-01", l
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify({ question, plant_id, lang } satisfies AskRequest),
     },
-    {
-      answer: `Grounded stub for '${question}' → check valve 3, bearing vibration up 12% in last 5 min (NATS: camera/thermal_high, source: tag-map line2).`,
-      vernacular: { en: "Check valve 3" },
-      sources: [{ id: "tag-map:line2", title: "Line 2 tag map" }],
-      grounded: true,
-    }
+    fallback as any
   );
 }
 
@@ -231,19 +239,22 @@ export async function ackEvent(station_id: string, defect_class: string, operato
   }
 }
 
-/** GET /metrics */
+/** GET /metrics — demo fallback gated behind DEMO */
 export async function fetchMetrics(): Promise<MetricsResponse> {
+  const fallback = isDemoEnabled()
+    ? {
+        walk_reads: [{ before: 48, after: 6 }],
+        opex: 18000,
+        uptime: 99.2,
+        mttd_min: 3,
+        mttr_min: 18,
+        p95_latency_ms: 38,
+      }
+    : undefined;
   return safeFetch<MetricsResponse>(
     `${API_URL}/metrics`,
     { headers: { ...authHeaders() } },
-    {
-      walk_reads: [{ before: 48, after: 6 }],
-      opex: 18000,
-      uptime: 99.2,
-      mttd_min: 3,
-      mttr_min: 18,
-      p95_latency_ms: 38,
-    }
+    fallback as any
   );
 }
 

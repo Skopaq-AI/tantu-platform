@@ -8,6 +8,7 @@ import { WalkReadsChart } from "@/components/charts/WalkReadsChart";
 import { WalkTrendChart } from "@/components/charts/FFTChart";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "@/lib/toast";
+import { fetchMetrics, isDemoEnabled } from "@/lib/api";
 import { Gauge, TrendingDown, Clock, Shield, Banknote, Calendar, ArrowUpRight, Check, FileText, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { motion } from "@/lib/motion";
@@ -18,13 +19,22 @@ export default function PlantHeadPage() {
   const [metrics, setMetrics] = useState<any>(null);
   const [showLOI, setShowLOI] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/metrics`, { cache: "no-store" })
-      .then((r) => r.json())
-      .then(setMetrics)
-      .catch(() => setMetrics({ walk_reads: { before: 48, after: 6 }, opex: 18000, uptime: 99.2 }))
-      .finally(() => setTimeout(() => setLoading(false), 500));
+    let cancelled = false;
+    fetchMetrics()
+      .then((data) => { if (!cancelled) { setMetrics(data); setError(null); } })
+      .catch((e) => {
+        if (isDemoEnabled() && !cancelled) {
+          setMetrics({ walk_reads: [{ before: 48, after: 6 }], opex: 18000, uptime: 99.2, mttd_min: 3, mttr_min: 18, p95_latency_ms: 38 });
+        } else if (!cancelled) {
+          setError(e?.message || "metrics unavailable");
+          setMetrics(null);
+        }
+      })
+      .finally(() => { if (!cancelled) setTimeout(() => setLoading(false), 500); });
+    return () => { cancelled = true; };
   }, []);
 
   return (
@@ -35,18 +45,18 @@ export default function PlantHeadPage() {
         <Badge variant="outline" className="gap-1"><Calendar className="h-3 w-3" /> 90-day pilot · reversible</Badge>
       </div>
 
-      {/* KPI row */}
+      {/* KPI row — real data from /metrics */}
       <div className="grid sm:grid-cols-3 gap-4">
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
           <Card className="border-emerald-200 dark:border-emerald-800">
             <CardHeader className="pb-2">
               <CardDescription className="flex items-center gap-1"><Banknote className="h-3 w-3" /> Opex / cluster / month</CardDescription>
-              <CardTitle className="text-3xl">Rs 18K <span className="text-sm font-normal text-slate-500">/ mo</span></CardTitle>
+              <CardTitle className="text-3xl">{metrics?.opex ? `Rs ${(metrics.opex/1000).toFixed(0)}K` : loading ? "…" : error ? "—" : "Rs 18K"} <span className="text-sm font-normal text-slate-500">/ mo</span></CardTitle>
             </CardHeader>
             <CardContent>
-              {loading ? <Skeleton className="h-20 w-full" /> : (
+              {loading ? <Skeleton className="h-20 w-full" /> : error && !metrics ? <div className="text-xs text-amber-600 border border-amber-200 bg-amber-50 dark:bg-amber-950 rounded-xl p-3">Metrics unavailable: {error} — real /metrics required. Enable DEMO to see mock.</div> : (
                 <>
-                  <div className="text-xs text-slate-500">Hardware amortized over 36 mo · includes edge + support · no capex board approval</div>
+                  <div className="text-xs text-slate-500">Hardware amortized over 36 mo · includes edge + support · no capex board approval {metrics?.opex ? `· live: ${metrics.opex}` : ""}</div>
                   <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                     <div className="border dark:border-slate-700 rounded-xl p-2.5"><div className="text-slate-500">Edge HW</div><div className="font-semibold">Rs 6.5K</div></div>
                     <div className="border dark:border-slate-700 rounded-xl p-2.5"><div className="text-slate-500">Platform + RAG</div><div className="font-semibold">Rs 8K</div></div>
@@ -63,11 +73,23 @@ export default function PlantHeadPage() {
           <Card>
             <CardHeader className="pb-2">
               <CardDescription className="flex items-center gap-1"><TrendingDown className="h-3 w-3" /> Walk-reads / day</CardDescription>
-              <CardTitle className="text-3xl">48 → 6 <span className="text-sm font-normal text-emerald-600">−87%</span></CardTitle>
+              <CardTitle className="text-3xl">
+                {(() => {
+                  const w = metrics?.walk_reads?.[0] || metrics?.walk_reads;
+                  const before = Array.isArray(w) ? w[0]?.before : w?.before;
+                  const after = Array.isArray(w) ? w[0]?.after : w?.after;
+                  if (before != null && after != null) {
+                    const pct = before ? Math.round((1 - after/before)*100) : 0;
+                    return <>{before} → {after} <span className="text-sm font-normal text-emerald-600">-{pct}%</span></>;
+                  }
+                  return loading ? "…" : error ? "—" : "48 → 6";
+                })()}
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-xs text-slate-500">Operator hours saved: 3.2 h/shift · reallocated to value-add · /metrics</div>
+              <div className="text-xs text-slate-500">Operator hours saved: {metrics?.walk_reads ? "live from /metrics" : "3.2 h/shift · reallocated to value-add · /metrics"}</div>
               <div className="mt-3 flex items-center gap-2 text-xs bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-xl p-2.5"><Check className="h-4 w-4 text-emerald-600" /> Before: manual gauge rounds · After: camera-as-adapter (Hailo-8L) + OPC-UA, derived events only</div>
+              {error && !metrics && <div className="text-[11px] text-amber-600 mt-2">Real metrics required — enable DEMO for mock.</div>}
             </CardContent>
           </Card>
         </motion.div>
@@ -76,13 +98,16 @@ export default function PlantHeadPage() {
           <Card>
             <CardHeader className="pb-2">
               <CardDescription className="flex items-center gap-1"><Clock className="h-3 w-3" /> MTTD / MTTR · Uptime</CardDescription>
-              <CardTitle className="text-3xl">{metrics?.uptime ?? 99.2}% <span className="text-sm font-normal text-slate-500">uptime</span></CardTitle>
+              <CardTitle className="text-3xl">{metrics?.uptime != null ? `${metrics.uptime}%` : loading ? "…" : error ? "—" : "99.2%"} <span className="text-sm font-normal text-slate-500">uptime</span></CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-xs text-slate-500">MTTD 22 min → 3 min · MTTR 45 min → 18 min · p95 edge latency &lt;40ms</div>
+              <div className="text-xs text-slate-500">
+                MTTD {metrics?.mttd_min ?? "22"} min → {metrics?.mttd_min ? `${metrics.mttd_min} min` : "3 min"} · MTTR {metrics?.mttr_min ?? "45"} min → {metrics?.mttr_min ? `${metrics.mttr_min} min` : "18 min"} · p95 {metrics?.p95_latency_ms ?? 38}ms
+              </div>
               <div className="mt-3 h-[80px]">
                 <WalkTrendChart />
               </div>
+              {error && !metrics && <div className="text-[11px] text-amber-600 mt-1">Uptime from /metrics — no mock when DEMO off.</div>}
             </CardContent>
           </Card>
         </motion.div>
@@ -96,8 +121,8 @@ export default function PlantHeadPage() {
             <CardDescription className="text-xs">Shift handover · pilot plants: demo-01, demo-02 · 90 days · /metrics + /poll</CardDescription>
           </CardHeader>
           <CardContent>
-            {loading ? <Skeleton className="h-[220px] w-full rounded-xl" /> : <WalkReadsChart />}
-            <div className="mt-2 text-[11px] text-slate-500 text-center">Derived telemetry only · raw frames never leave plant · DPDP 2023 compliant</div>
+            {loading ? <Skeleton className="h-[220px] w-full rounded-xl" /> : error && !metrics ? <div className="text-xs text-amber-600 border border-amber-200 bg-amber-50 rounded-xl p-4 text-center">Live metrics unavailable — {error}. Enable NEXT_PUBLIC_DEMO=true for mock.</div> : <WalkReadsChart data={metrics?.walk_reads} />}
+            <div className="mt-2 text-[11px] text-slate-500 text-center">Derived telemetry only · raw frames never leave plant · DPDP 2023 compliant {metrics ? "· live /metrics" : ""}</div>
           </CardContent>
         </Card>
 

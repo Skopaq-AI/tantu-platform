@@ -45,7 +45,7 @@ export default function AdminUsersPage() {
 
 function AdminUsersInner() {
   const { user, token, currentOrg } = useAuth();
-  const [users, setUsers] = useState<ManagedUser[]>(() => mockUsers(currentOrg?.id || "org-demo-01"));
+  const [users, setUsers] = useState<ManagedUser[]>(() => []);
   const [query, setQuery] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -57,7 +57,7 @@ function AdminUsersInner() {
   const [editPlant, setEditPlant] = useState<string>("plant-demo-01");
   const [loading, setLoading] = useState(true);
 
-  // fetch real users if API available
+  // fetch real users — no mock unless DEMO=true
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 500);
     return () => clearTimeout(t);
@@ -82,9 +82,18 @@ function AdminUsersInner() {
               status: u.status || "active",
             }));
             setUsers(normalized);
+            return;
           }
         }
-      } catch {}
+        // fallback only in DEMO mode
+        if (process.env.NEXT_PUBLIC_DEMO === "true") {
+          setUsers(mockUsers(currentOrg?.id || "org-demo-01"));
+        }
+      } catch {
+        if (process.env.NEXT_PUBLIC_DEMO === "true") {
+          setUsers(mockUsers(currentOrg?.id || "org-demo-01"));
+        }
+      }
     })();
   }, [token, currentOrg?.id]);
 
@@ -131,7 +140,11 @@ function AdminUsersInner() {
       }
     } catch {}
 
-    // mock fallback: generate local invite token (base64 payload)
+    // mock fallback gated behind DEMO flag: generate local invite token
+    if (process.env.NEXT_PUBLIC_DEMO !== "true") {
+      toast.error("Invite failed — backend unreachable and DEMO mock disabled");
+      return;
+    }
     const payload = {
       email: inviteEmail,
       role: inviteRole,

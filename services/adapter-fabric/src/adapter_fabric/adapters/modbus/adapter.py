@@ -144,6 +144,36 @@ class ModbusAdapter(BaseAdapter):
         # infer count for float types if not specified handled by caller (use mapping.data_type)
         return fc, addr, count
 
+    def _resolve_unit(self) -> int:
+        """Resolve Modbus unit/slave/device_id with fallback aliases."""
+        p = self.config.params
+        # Accept unit_id, slave, device_id, unit (in that precedence)
+        for key in ("unit_id", "slave", "device_id", "unit", "slave_id"):
+            if key in p and p[key] is not None:
+                try:
+                    return int(p[key])  # type: ignore
+                except Exception:
+                    continue
+        return 1
+
+    async def _call_with_unit_fallback(self, method, addr: int, count: int, unit: int):  # type: ignore
+        """Call pymodbus method with slave->device_id->no-unit fallback."""
+        # Try slave first (pymodbus <3.7), then device_id (>=3.7), then no unit kwarg
+        try:
+            return await method(addr, count=count, slave=unit)  # type: ignore
+        except TypeError as te:
+            msg = str(te).lower()
+            if "slave" in msg or "unexpected keyword" in msg or "got an unexpected" in msg:
+                try:
+                    return await method(addr, count=count, device_id=unit)  # type: ignore
+                except TypeError as te2:
+                    msg2 = str(te2).lower()
+                    if "device_id" in msg2 or "unexpected keyword" in msg2 or "got an unexpected" in msg2:
+                        # final fallback: some TCP stacks ignore unit entirely
+                        return await method(addr, count=count)  # type: ignore
+                    raise
+            raise
+
     async def _read_tag_raw(self, tag: str, data_type: str) -> Optional[float]:
         if not _HAS_PYMODBUS or self._client is None:
             return None
@@ -151,37 +181,18 @@ class ModbusAdapter(BaseAdapter):
         # auto-expand count for 32-bit types
         if data_type.lower() in ("float32", "int32", "uint32") and count == 1:
             count = 2
-        unit = int(self.config.params.get("unit_id", 1))
+        unit = self._resolve_unit()
         try:
-            # pymodbus 3.x uses device_id, older uses slave; TCP may not need unit - try compat
-            kwargs = {}
-            # probe which kwarg is accepted by inspecting signature would be heavy; try slave first
-            try:
-                if fc == 1:
-                    resp = await self._client.read_coils(addr, count=count, slave=unit)  # type: ignore
-                elif fc == 2:
-                    resp = await self._client.read_discrete_inputs(addr, count=count, slave=unit)  # type: ignore
-                elif fc == 3:
-                    resp = await self._client.read_holding_registers(addr, count=count, slave=unit)  # type: ignore
-                elif fc == 4:
-                    resp = await self._client.read_input_registers(addr, count=count, slave=unit)  # type: ignore
-                else:
-                    raise ValueError(f"Unsupported function code {fc}")
-            except TypeError as te:
-                if "slave" in str(te):
-                    # fallback to device_id (pymodbus >=3.7) or no unit for TCP
-                    if fc == 1:
-                        resp = await self._client.read_coils(addr, count=count, device_id=unit)  # type: ignore
-                    elif fc == 2:
-                        resp = await self._client.read_discrete_inputs(addr, count=count, device_id=unit)  # type: ignore
-                    elif fc == 3:
-                        resp = await self._client.read_holding_registers(addr, count=count, device_id=unit)  # type: ignore
-                    elif fc == 4:
-                        resp = await self._client.read_input_registers(addr, count=count, device_id=unit)  # type: ignore
-                    else:
-                        raise
-                else:
-                    raise
+            if fc == 1:
+                resp = await self._call_with_unit_fallback(self._client.read_coils, addr, count, unit)  # type: ignore
+            elif fc == 2:
+                resp = await self._call_with_unit_fallback(self._client.read_discrete_inputs, addr, count, unit)  # type: ignore
+            elif fc == 3:
+                resp = await self._call_with_unit_fallback(self._client.read_holding_registers, addr, count, unit)  # type: ignore
+            elif fc == 4:
+                resp = await self._call_with_unit_fallback(self._client.read_input_registers, addr, count, unit)  # type: ignore
+            else:
+                raise ValueError(f"Unsupported function code {fc}")
             if resp.isError():  # type: ignore
                 raise RuntimeError(f"Modbus read error fc={fc} addr={addr}: {resp}")
             if fc in (1, 2):

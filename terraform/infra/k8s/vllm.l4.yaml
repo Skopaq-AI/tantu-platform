@@ -1,8 +1,60 @@
 # TANTU vLLM — Nemotron-9B on L4 (GKE Autopilot)
+# ==============================================================================
+# GPU QUOTA WIRING — DOCUMENTATION
+# ==============================================================================
+# This Deployment requires GKE Autopilot GPU quota for NVIDIA L4 in region asia-south1.
+#
+# 1. QUOTA PREREQUISITES
+#    - Quota name:  NVIDIA_L4_GPUS (per-region) + optional NVIDIA_L4_GPUS_PER_NODE if enforced
+#    - Region:      asia-south1 (Mumbai) — matches var.region and cluster location
+#    - Required:    1 L4 GPU (requests nvidia.com/gpu: 1). For HA / rolling, request 2.
+#    - Check:       gcloud compute project-info describe --project=tantu-beta-20260821-01 \
+#                     --format="json(quotas)" | jq '.quotas[] | select(.metric | contains("NVIDIA_L4"))'
+#                  gcloud compute accelerator-types list --filter="name:nvidia-l4" \
+#                     --project=tantu-beta-20260821-01
+#                  gcloud compute regions describe asia-south1 --project=tantu-beta-20260821-01 \
+#                     --format="json(quotas)" | jq '.quotas[] | select(.metric | contains("L4"))'
+#
+# 2. HOW TO REQUEST QUOTA
+#    Console: IAM & Admin → Quotas → filter "NVIDIA L4 GPUs" → asia-south1 → Edit Quotas → Request 1-2
+#    CLI:     gcloud alpha services quota update --service=compute.googleapis.com \
+#               --consumer=projects/tantu-beta-20260821-01 --metric=nvidia_l4_gpus \
+#               --unit="1/{project}/{region}" --value=1 --dimensions=region=asia-south1
+#            Or file a support case via Cloud Console → Support → Quotas.
+#    Wait 24-48h for approval. Until approved, pods stay Pending (Insufficient nvidia.com/gpu)
+#    but the cluster and other workloads are unaffected — DualRouter fallback keeps
+#    reasoning-copilot serving grounded mocks without vLLM.
+#
+# 3. AUTOPILOT GPU WIRING (this file)
+#    - nodeSelector:  cloud.google.com/gke-accelerator: nvidia-l4
+#      → Tells Autopilot to provision an L4 accelerator node. For Standard GKE, use
+#        nodeSelector: { accelerator: nvidia-tesla-l4 } or a GPU node-pool label.
+#    - tolerations:   - key: nvidia.com/gpu, operator: Exists, effect: NoSchedule
+#      → Required to schedule onto GPU tainted nodes.
+#    - resources:     requests/limits: nvidia.com/gpu: 1 + cpu 4, memory 20-24Gi
+#      → Resource request triggers Autopilot node provisioning. Must match limits.
+#    - strategy:      Recreate (GPU cannot be shared across pods concurrently).
+#    - annotation:    cloud.google.com/gke-gpu-driver-version: "latest" (driver auto-install)
+#    - volumes:       emptyDir medium: Memory for /dev/shm 8Gi (NCCL shared memory).
+#      Optional PVC vllm-model-cache 40Gi (standard-rwo) for HF cache to speed cold start.
+#
+# 4. APPLY / VERIFY
+#    kubectl apply -f vllm.l4.yaml
+#    kubectl describe pod -n tantu -l app=vllm   # check Events for quota/scheduling
+#    kubectl logs -n tantu -l app=vllm -c vllm --follow
+#    kubectl get events -n tantu --sort-by=.lastTimestamp | grep -i -E "gpu|quota|FailedScheduling"
+#    # Health: curl http://vllm:8000/health  or  http://vllm:8000/v1/models
+#
+# 5. COST & LIFECYCLE
+#    - L4 nodes bill per-second while Pod is scheduled; scale to 0 when idle via
+#      `kubectl scale deployment vllm -n tantu --replicas=0` or HPA on queue depth.
+#    - No preemption: GPU pods are not Spot/preemptible by default.
+#    - Image pin: vllm/vllm-openai:v0.6.3@sha256:<digest> — update via `crane digest`
+#    - Fallback: reasoning-copilot checks VLLM_URL=http://vllm:8000/v1/chat/completions;
+#      if unreachable, returns grounded mock (no stub / no crash).
+# ==============================================================================
 # Apply ONLY when L4 quota available; otherwise pods stay Pending but cluster is unaffected
 # DualRouter fallback keeps reasoning-copilot serving grounded mocks.
-#   gcloud compute accelerator-types list --filter="name:nvidia-l4" --project=tantu-beta-20260821-01
-#   gcloud compute project-info describe --project=tantu-beta-20260821-01 --format="value(quotas[].limit)" | grep -i l4 || echo "no L4 quota"
 #   kubectl apply -f vllm.l4.yaml
 # Troubleshoot: kubectl describe pod -n tantu -l app=vllm ; kubectl logs -n tantu -l app=vllm -c vllm
 ---
@@ -50,7 +102,7 @@ spec:
           effect: NoSchedule
       containers:
         - name: vllm
-          image: vllm/vllm-openai:v0.6.3  # pin; :latest also works
+          image: vllm/vllm-openai:v0.6.3@sha256:246d1b25a7828c2c8890a2b79d3892a94a509e24fb3cfb93798e7f24faea0795 # pinned digest
           imagePullPolicy: IfNotPresent
           command:
             - python3

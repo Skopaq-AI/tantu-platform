@@ -15,11 +15,21 @@ resource "google_secret_manager_secret" "secrets" {
   }
 }
 
+# Random placeholder — generated securely; rotate via gcloud secrets versions add
+# Value is usable immediately and is ignored on updates (lifecycle ignore_changes)
+resource "random_password" "placeholder" {
+  for_each = var.secrets
+  length  = 32
+  special = true
+  # Keep Terraform formatting stable: allow common specials that are shell-safe
+  override_special = "_-"
+}
+
 resource "google_secret_manager_secret_version" "placeholder" {
   for_each = var.secrets
 
   secret      = google_secret_manager_secret.secrets[each.key].id
-  secret_data = "REPLACE_ME_${upper(replace(each.key, "-", "_"))}"
+  secret_data = random_password.placeholder[each.key].result
 
   lifecycle {
     ignore_changes = [secret_data]

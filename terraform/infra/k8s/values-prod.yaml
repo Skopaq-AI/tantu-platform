@@ -38,7 +38,10 @@ frontend:
 
 qdrant:
   replicaCount: 3
-  persistence: { size: 50Gi }
+  persistence:
+    enabled: true
+    size: 50Gi
+    storageClass: standard-rwo
   antiAffinity: required
 
 # Argo Rollouts — automated analysis (error rate, p95 latency) before promotion

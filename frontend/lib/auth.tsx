@@ -1,6 +1,6 @@
 "use client";
 import React, { createContext, useContext, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { API_URL } from "@/lib/api";
+import { API_URL, isDemoEnabled } from "@/lib/api";
 
 export type Role =
   | "OPERATOR"
@@ -244,9 +244,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   } catch {}
                 }
               } else {
-                // keep stale for demo but mark expired; or clear
-                // For demo, allow stale mock tokens to stay valid for offline
-                if (stored.includes("mock_signature")) {
+                // gate mock_signature fallback behind DEMO flag
+                if (isDemoEnabled() && stored.includes("mock_signature")) {
                   if (payload) setUser(payloadToUser(payload));
                   setToken(stored);
                 } else {
@@ -254,7 +253,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 }
               }
             } catch {
-              if (payload && stored.includes("mock_signature")) {
+              if (isDemoEnabled() && payload && stored.includes("mock_signature")) {
                 setUser(payloadToUser(payload));
                 setToken(stored);
               } else {
@@ -494,10 +493,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (e: any) {
         // if it's an explicit auth error, rethrow
         if (e && e.message === "Invalid credentials") throw e;
-        // otherwise fall through to mock
+        // otherwise fall through to mock only if DEMO flag enabled
+        if (!isDemoEnabled()) throw e;
       }
 
-      // --- DEMO MOCK FALLBACK (offline) ---
+      // --- DEMO MOCK FALLBACK (offline) gated behind DEMO flag ---
+      if (!isDemoEnabled()) throw new Error("Login failed — DEMO mock disabled and backend unreachable");
       // For demo/offline: accept any password >=4 chars, infer role from email
       if (!email || !email.includes("@")) throw new Error("Please enter a valid email");
       if (!password || password.length < 4) throw new Error("Password must be at least 4 characters");
@@ -565,9 +566,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (e: any) {
         if (e && e.message && !e.message.includes("fetch") && !e.message.includes("Failed")) throw e;
+        if (!isDemoEnabled()) throw e;
       }
 
-      // mock fallback: create org + OWNER user
+      // mock fallback gated behind DEMO flag: create org + OWNER user
+      if (!isDemoEnabled()) throw new Error("Signup failed — DEMO mock disabled and backend unreachable");
       const orgId = "org-" + Math.random().toString(36).slice(2, 8);
       const mockPayload: JWTPayload = {
         sub: email,
@@ -618,13 +621,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refresh = useCallback(async (): Promise<string | null> => {
     const t = await tryRefresh();
     if (t) return t;
-    // if refresh failed and token expired, logout
+    // if refresh failed and token expired, logout — keep mock tokens only if DEMO enabled
     const cur = tokenRef.current;
     if (cur) {
       const p = decodeJWT(cur);
       if (p?.exp && p.exp * 1000 < Date.now()) {
-        // keep mock tokens alive for demo offline
-        if (!cur.includes("mock_signature")) {
+        if (!cur.includes("mock_signature") || !isDemoEnabled()) {
           await logout();
           return null;
         }
@@ -693,8 +695,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (e: any) {
         if (e && e.message && !e.message.includes("fetch") && !e.message.includes("Failed to fetch")) throw e;
+        if (!isDemoEnabled()) throw e;
       }
-      // mock fallback: decode invite token as base64 json if possible, else use role OPERATOR
+      if (!isDemoEnabled()) throw new Error("Invite accept failed — DEMO mock disabled and backend unreachable");
+      // mock fallback gated behind DEMO flag: decode invite token as base64 json if possible, else use role OPERATOR
       let role: Role = "OPERATOR";
       let orgId = "org-demo-01";
       let orgName = "Tantu Demo Org";
@@ -749,13 +753,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const target = orgs.find((o) => o.id === orgId);
       if (!target) return;
       setCurrentOrg(target);
-      // optionally re-issue token with new org? For mock, patch token payload
+      // optionally re-issue token with new org? For mock, patch token payload gated behind DEMO
       const cur = tokenRef.current;
       if (cur) {
         const p = decodeJWT(cur);
         if (p) {
           const updated: JWTPayload = { ...p, org_id: target.id, org_name: target.name };
-          const newTok = cur.includes("mock_signature") ? makeMockJWT(updated) : cur;
+          const newTok = cur.includes("mock_signature") && isDemoEnabled() ? makeMockJWT(updated) : cur;
           if (newTok !== cur) {
             setToken(newTok);
             setUser(payloadToUser(updated));

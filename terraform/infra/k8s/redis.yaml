@@ -1,3 +1,6 @@
+# TANTU Redis — in-cluster (PVC-backed) for dev; Memorystore for prod (terraform/modules/redis)
+# PVC wiring: redis-data (standard-rwo, 5Gi) mounted at /data with --appendonly yes --dir /data
+# Survives pod reschedule to new node (Autopilot). Qdrant PVC is via StatefulSet volumeClaimTemplates (standard-rwo).
 apiVersion: v1
 kind: Service
 metadata:
@@ -42,7 +45,7 @@ spec:
           operator: Exists
       containers:
         - name: redis
-          image: redis:7-alpine
+          image: redis:7-alpine@sha256:f1fb85a670f841df695aecff0c0c06e0851c653f38f3d1ba32664b2727f5e1c1 # pinned digest
           ports:
             - containerPort: 6379
           args: ["redis-server", "--appendonly", "yes", "--save", "60", "1", "--dir", "/data"]

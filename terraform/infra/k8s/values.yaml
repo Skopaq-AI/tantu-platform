@@ -1,5 +1,6 @@
 # TANTU — Helm values (base) — Autopilot + Gateway API + Argo Rollouts canary
-# Image pulls from Artifact Registry: asia-south1-docker.pkg.dev/<project>/tantu/<service>:<tag>
+# Image pulls from Artifact Registry: asia-south1-docker.pkg.dev/<project>/tantu/<service>:<tag>@sha256:<digest>
+# Pinned digests: update after `docker buildx` push (see CD workflow "Image digest" step or `crane digest`).
 # Deploy via: helm upgrade --install tantu ./helm/tantu -f infra/k8s/values.yaml -f infra/k8s/values-<env>.yaml
 
 global:
@@ -13,8 +14,9 @@ backend:
   replicaCount: 2
   image:
     repository: asia-south1-docker.pkg.dev/PROJECT_ID/tantu/backend
-    tag: latest # override: --set backend.image.tag=$COMMIT_SHA
-    pullPolicy: Always
+    tag: v0.9.0 # pinned tag — override: --set backend.image.tag=$COMMIT_SHA
+    digest: sha256:82811da871b677315d6273a9724e7adc56645e0eb0f15d9075520a920fae6d17 # pinned digest for backend:v0.9.0
+    pullPolicy: IfNotPresent
   serviceAccount:
     create: true
     name: api
@@ -84,8 +86,9 @@ frontend:
   replicaCount: 2
   image:
     repository: asia-south1-docker.pkg.dev/PROJECT_ID/tantu/frontend
-    tag: latest
-    pullPolicy: Always
+    tag: v0.9.0 # pinned
+    digest: sha256:44f523aa4d0c0fd2e4e1cff0d747db8bcaf442843cb56eed9d9f2905be843ff8 # pinned digest for frontend:v0.9.0
+    pullPolicy: IfNotPresent
   serviceAccount:
     create: false
   resources:
@@ -99,9 +102,14 @@ frontend:
   autoscaling: { enabled: true, minReplicas: 2, maxReplicas: 6, targetCPUUtilizationPercentage: 70 }
 
 # ── Qdrant is deployed via Terraform helm_release; values here are for reference/sync only ──
+# PVC wiring: standard-rwo is Autopilot default; size 10Gi dev / 50Gi prod; StatefulSet volumeClaimTemplates
 qdrant:
   enabled: true
   replicaCount: 1 # 3 in prod (see values-prod.yaml)
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: standard-rwo
 
 # ── Argo Rollouts — controller installed via Terraform or via Helm here ──
 argoRollouts:

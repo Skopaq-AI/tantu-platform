@@ -1,10 +1,31 @@
+"use client";
 import Link from "next/link";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Shield, Factory, Eye, Cpu, MessageSquare, Clock, Gauge, Users, Lock, Database, Check, ChevronRight, Play, FileText, Phone, Mail, Brain, Sparkles, Bot, ScanEye, Zap } from "lucide-react";
 
+function roleToDashboard(role: string): string {
+  const r = (role || "").toUpperCase();
+  if (r === "OPERATOR") return "/operator";
+  if (r.startsWith("MAINTENANCE")) return "/maintenance";
+  if (r === "PLANT_HEAD") return "/plant-head";
+  if (r === "ORG_ADMIN" || r === "OWNER" || r === "ADMIN") return "/admin/users";
+  return "/operator";
+}
+
 export default function LandingPage() {
+  const { user, isAuthenticated, loading } = useAuth();
+  const router = useRouter();
+  useEffect(() => {
+    if (!loading && isAuthenticated && user) {
+      const dest = roleToDashboard(user.role);
+      router.replace(dest);
+    }
+  }, [loading, isAuthenticated, user, router]);
   return (
     <div className="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100">
       {/* HERO — child-simple: what we do in one sentence */}

@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn, protocolColor } from "@/lib/utils";
-import { askCopilot, ackEvent, DefectEvent, getSSEUrl } from "@/lib/api";
+import { askCopilot, ackEvent, DefectEvent, getSSEUrl, API_URL, isDemoEnabled } from "@/lib/api";
 import { FFTChart, WalkTrendChart } from "@/components/charts/FFTChart";
 import { RoleGuard } from "@/components/RoleGuard";
 import { LayoutGrid, Activity, AlertTriangle, Check, Search, Filter, Radio, Sparkles, Copy } from "lucide-react";
@@ -35,12 +35,12 @@ export default function MaintenancePage() {
     return () => clearTimeout(t);
   }, []);
 
-  // fallback poll if SSE not connected
+  // fallback poll if SSE not connected — fetch real /events
   useEffect(() => {
     if (sse.connected && sse.events.length > 0) return;
     const id = setInterval(async () => {
       try {
-        const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/events?limit=12`, { cache: "no-store" });
+        const r = await fetch(`${API_URL}/events?limit=12`, { cache: "no-store" });
         if (r.ok) setPollEvents(await r.json());
       } catch {}
     }, 2500);
@@ -50,7 +50,8 @@ export default function MaintenancePage() {
   const events: DefectEvent[] = useMemo(() => {
     const merged = sse.events.length ? sse.events : pollEvents;
     if (merged.length) return merged;
-    // demo fallback
+    if (!isDemoEnabled()) return [];
+    // demo fallback gated behind DEMO flag
     const now = Date.now() / 1000;
     return [
       { station_id: "line2-cluster1-gauge3", track: "line", defect_class: "pressure_drift", confidence: 0.92, latency_ms: 22, timestamp: now, protocol: "camera", adapter_id: "cam-01" },

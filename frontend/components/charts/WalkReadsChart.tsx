@@ -1,14 +1,24 @@
 "use client";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid } from "recharts";
 
-const data = [
+const defaultData = [
   { name: "Line 1", before: 52, after: 7 },
   { name: "Line 2", before: 48, after: 6 },
   { name: "Line 3", before: 44, after: 5 },
   { name: "Fab-A", before: 36, after: 4 },
 ];
 
-export function WalkReadsChart() {
+export function WalkReadsChart({ data: propData }: { data?: { name?: string; before: number; after: number }[] | { before: number; after: number }[] | null } = {}) {
+  const data = (() => {
+    if (Array.isArray(propData) && propData.length) {
+      return propData.map((d: any, i: number) => ({
+        name: d.name || `Line ${i + 1}`,
+        before: d.before,
+        after: d.after,
+      }));
+    }
+    return defaultData;
+  })();
   return (
     <div className="h-[220px] w-full">
       <ResponsiveContainer width="100%" height="100%">
@@ -30,7 +40,7 @@ export function WalkReadsInline() {
   return (
     <div className="h-[140px] w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data.slice(0, 2)} layout="vertical">
+        <BarChart data={defaultData.slice(0, 2)} layout="vertical">
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis type="number" hide />
           <YAxis dataKey="name" type="category" width={60} tick={{ fontSize: 12 }} />

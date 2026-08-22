@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { Mic, LayoutGrid, Gauge, Activity, Moon, Sun, Menu, LogIn, LogOut, Shield, ChevronDown, Users, Building2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "@/lib/toast";
+import { API_URL } from "@/lib/api";
 
 const nav = [
   { href: "/operator", label: "Operator", icon: Mic, langKey: "operator", desc: "Voice · 85dB", roles: ["OPERATOR", "ORG_ADMIN", "OWNER"] },
@@ -31,11 +32,11 @@ export function Header() {
     const d = localStorage.getItem("tantu_dark") === "1" || (window.matchMedia("(prefers-color-scheme: dark)").matches && !localStorage.getItem("tantu_dark"));
     setDark(d);
     document.documentElement.classList.toggle("dark", d);
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/health`)
+    fetch(`${API_URL}/health`)
       .then((r) => (r.ok ? setHealth("ok") : setHealth("offline")))
       .catch(() => setHealth("offline"));
     const id = setInterval(() => {
-      fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/health`, { cache: "no-store" })
+      fetch(`${API_URL}/health`, { cache: "no-store" })
         .then((r) => setHealth(r.ok ? "ok" : "offline"))
         .catch(() => setHealth("offline"));
     }, 15000);

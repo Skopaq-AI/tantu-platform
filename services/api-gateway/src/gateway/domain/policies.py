@@ -55,6 +55,94 @@ ROLE_PERMISSIONS: dict[str, set[tuple[str, str]]] = {
         ("read", "health"),
         ("health", "health"),
     },
+    # Canonical 9-role extensions — industrial RBAC aliases. Wildcard within plant.
+    "PLATFORM_SUPER_ADMIN": {("*", "*")},
+    "ORG_OWNER": {("*", "*")},
+    "ORG_ADMIN": {("*", "*")},
+    "PLANT_HEAD": {("*", "*")},
+    "ADMIN": {("*", "*")},
+    "OWNER": {("*", "*")},
+    # Lower-case / legacy aliases map to same wildcard sets
+    "platform_super_admin": {("*", "*")},
+    "org_owner": {("*", "*")},
+    "org_admin": {("*", "*")},
+    "plant_head": {("*", "*")},
+    "admin": {("*", "*")},
+    "owner": {("*", "*")},
+    # Upper-case legacy gateway roles map to existing fine-grained perms
+    "OPERATOR": {
+        ("read", "telemetry"),
+        ("read", "events"),
+        ("read", "reports"),
+        ("post", "ingest"),
+        ("read", "health"),
+        ("health", "health"),
+    },
+    "MAINTENANCE": {
+        ("read", "telemetry"),
+        ("read", "events"),
+        ("read", "reports"),
+        ("read", "health"),
+        ("health", "health"),
+        ("post", "ingest"),
+        ("write", "maintenance"),
+        ("post", "maintenance"),
+        ("read", "maintenance"),
+    },
+    "VIEWER": {
+        ("read", "telemetry"),
+        ("read", "events"),
+        ("read", "reports"),
+        ("read", "health"),
+        ("health", "health"),
+    },
+    # Additional industrial roles
+    "MAINTENANCE_LEAD": {
+        ("read", "telemetry"),
+        ("read", "events"),
+        ("read", "reports"),
+        ("read", "health"),
+        ("health", "health"),
+        ("post", "ingest"),
+        ("write", "maintenance"),
+        ("post", "maintenance"),
+        ("read", "maintenance"),
+    },
+    "MAINTENANCE_TECH": {
+        ("read", "telemetry"),
+        ("read", "events"),
+        ("read", "reports"),
+        ("read", "health"),
+        ("health", "health"),
+        ("post", "ingest"),
+        ("write", "maintenance"),
+        ("post", "maintenance"),
+        ("read", "maintenance"),
+    },
+    "maintenance_lead": {
+        ("read", "telemetry"),
+        ("read", "events"),
+        ("read", "reports"),
+        ("read", "health"),
+        ("health", "health"),
+        ("post", "ingest"),
+        ("write", "maintenance"),
+        ("post", "maintenance"),
+        ("read", "maintenance"),
+    },
+    "maintenance_tech": {
+        ("read", "telemetry"),
+        ("read", "events"),
+        ("read", "reports"),
+        ("read", "health"),
+        ("health", "health"),
+        ("post", "ingest"),
+        ("write", "maintenance"),
+        ("post", "maintenance"),
+        ("read", "maintenance"),
+    },
+    "INTEGRATION_BOT": {("*", "*")},
+    "integration_bot": {("*", "*")},
 }
 
 
@@ -113,7 +201,14 @@ class PolicyDecision:
 
 
 def _role_allows(role: str, action: str, resource: str) -> tuple[bool, Optional[tuple[str, str]]]:
+    # Canonicalize role: try exact, then lower, then upper, then casefold aliases
     perms = ROLE_PERMISSIONS.get(role)
+    if perms is None:
+        # Try lower and upper and casefold mirror
+        perms = ROLE_PERMISSIONS.get(role.lower()) or ROLE_PERMISSIONS.get(role.upper())
+    if perms is None:
+        # Try mapping via aliases (e.g., 'Operator' -> 'operator')
+        perms = ROLE_PERMISSIONS.get(role.strip().lower()) or ROLE_PERMISSIONS.get(role.strip().upper())
     if perms is None:
         return False, None
     # exact match

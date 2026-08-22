@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ackEvent } from "@/lib/api";
+import { ackEvent, API_URL, isDemoEnabled } from "@/lib/api";
 import { RoleGuard } from "@/components/RoleGuard";
 import { Mic, MicOff, Volume2, Check, AlertTriangle, Wifi, Hand, Sparkles, Activity } from "lucide-react";
 
@@ -17,26 +17,48 @@ type Alert = { station_id: string; defect_class: string; confidence: number; lat
 export default function OperatorPage() {
   const { lang, setLang } = useI18n();
   const speech = useSpeech(lang);
-  const [alert, setAlert] = useState<Alert>({ station_id: "line2-cluster1-gauge3", defect_class: "pressure_drift", confidence: 0.92, latency_ms: 22, protocol: "camera", ts: Date.now() });
+  const [alert, setAlert] = useState<Alert | null>(null);
   const [acked, setAcked] = useState(false);
   const [queue, setQueue] = useState<Alert[]>([]);
   const [dbLevel] = useState(85);
   const [loading, setLoading] = useState(true);
 
+  // initial fetch of real event — no hardcoded fallback unless DEMO enabled
   useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 600);
-    return () => clearTimeout(t);
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(`${API_URL}/events?limit=1`, { cache: "no-store" });
+        if (r.ok) {
+          const arr = await r.json();
+          if (arr[0] && !cancelled) {
+            setAlert({ station_id: arr[0].station_id, defect_class: arr[0].defect_class, confidence: arr[0].confidence ?? 0.9, latency_ms: arr[0].latency_ms ?? 0, protocol: arr[0].protocol ?? "unknown", ts: Date.now() });
+          } else if (isDemoEnabled() && !cancelled) {
+            setAlert({ station_id: "line2-cluster1-gauge3", defect_class: "pressure_drift", confidence: 0.92, latency_ms: 22, protocol: "camera", ts: Date.now() });
+          }
+        } else if (isDemoEnabled() && !cancelled) {
+          setAlert({ station_id: "line2-cluster1-gauge3", defect_class: "pressure_drift", confidence: 0.92, latency_ms: 22, protocol: "camera", ts: Date.now() });
+        }
+      } catch {
+        if (isDemoEnabled() && !cancelled) {
+          setAlert({ station_id: "line2-cluster1-gauge3", defect_class: "pressure_drift", confidence: 0.92, latency_ms: 22, protocol: "camera", ts: Date.now() });
+        }
+      } finally {
+        if (!cancelled) setTimeout(() => setLoading(false), 400);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
-  // poll for live alerts (SSE fallback via poll)
+  // poll for live alerts (SSE fallback via poll) — fetch real /events
   useEffect(() => {
     const id = setInterval(async () => {
       try {
-        const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/events?limit=1`, { cache: "no-store" });
+        const r = await fetch(`${API_URL}/events?limit=1`, { cache: "no-store" });
         if (r.ok) {
           const arr = await r.json();
-          if (arr[0] && arr[0].defect_class !== "none" && arr[0].station_id !== alert.station_id) {
-            setQueue((q) => [alert, ...q].slice(0, 5));
+          if (arr[0] && arr[0].defect_class !== "none" && arr[0].station_id !== alert?.station_id) {
+            if (alert) setQueue((q) => [alert, ...q].slice(0, 5));
             setAlert({ station_id: arr[0].station_id, defect_class: arr[0].defect_class, confidence: arr[0].confidence, latency_ms: arr[0].latency_ms, protocol: arr[0].protocol, ts: Date.now() });
             setAcked(false);
             toast.info(`New alert: ${arr[0].station_id}`);
@@ -45,9 +67,10 @@ export default function OperatorPage() {
       } catch {}
     }, 3000);
     return () => clearInterval(id);
-  }, [alert.station_id]);
+  }, [alert?.station_id]);
 
   const handleAck = async () => {
+    if (!alert) return;
     // optimistic
     setAcked(true);
     toast.success(t("vernacular_ack_done", lang), { description: alert.station_id });
@@ -103,12 +126,13 @@ export default function OperatorPage() {
                 <span className="ml-auto text-xs font-normal text-slate-500 flex items-center gap-1">{dbLevel} dB · 12h shift <Activity className="h-3 w-3 ml-1" /></span>
               </CardTitle>
               <CardDescription className="text-xs flex flex-wrap gap-2">
-                <span>{alert.station_id} · {alert.protocol} · {alert.latency_ms}ms · {Math.round(alert.confidence * 100)}%</span>
+                {alert ? <span>{alert.station_id} · {alert.protocol} · {alert.latency_ms}ms · {Math.round(alert.confidence * 100)}%</span> : <span className="text-slate-400">No live alert — waiting for /events</span>}
                 <Badge variant="outline" className="text-[10px]">Web Speech API · 5-lang</Badge>
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* vernacular large */}
+              {alert ? (
               <motion.div layout className={`rounded-2xl p-6 text-center ${acked ? "bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800" : "bg-amber-50 dark:bg-amber-950 border-2 border-amber-300 dark:border-amber-700"}`}>
                 <div className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold flex items-center justify-center gap-1"><Volume2 className="h-3 w-3" /> Vernacular · {lang.toUpperCase()} · Framer Motion</div>
                 <AnimatePresence mode="wait">
@@ -119,16 +143,22 @@ export default function OperatorPage() {
                 <div className="mt-1 text-xs text-slate-500">{t("vernacular_vib", lang)}</div>
                 {!acked && <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="mt-3 inline-flex items-center gap-2 text-xs bg-white dark:bg-slate-900 border dark:border-slate-700 rounded-full px-3 py-1"><span className="h-2 w-2 bg-red-500 rounded-full animate-pulse" /> {t("live", lang)} · {alert.defect_class} <Sparkles className="h-3 w-3 text-amber-500" /></motion.div>}
               </motion.div>
+              ) : (
+                <div className="rounded-2xl p-6 text-center bg-slate-50 dark:bg-slate-800 border border-dashed dark:border-slate-700">
+                  <div className="text-sm font-semibold text-slate-600 dark:text-slate-300">No alerts right now</div>
+                  <div className="text-xs text-slate-500 mt-1">Listening on {API_URL}/events — real data, no mock when DEMO is off</div>
+                </div>
+              )}
 
               {/* one-button ack */}
               <motion.div whileTap={{ scale: 0.98 }}>
                 <Button
                   onClick={handleAck}
-                  disabled={acked}
+                  disabled={acked || !alert}
                   variant={acked ? "secondary" : "primary"}
                   size="touch"
                   className={`w-full text-xl font-bold glove-target rounded-2xl h-[72px] ${acked ? "opacity-60" : "shadow-lg hover:shadow-xl"}`}
-                  aria-label={`Acknowledge ${alert.station_id}`}
+                  aria-label={alert ? `Acknowledge ${alert.station_id}` : "No alert to acknowledge"}
                 >
                   {acked ? <><Check className="h-7 w-7 mr-2" /> {t("ack", lang)} ✓</> : <>✓ {t("ack", lang)} — TAP</>}
                 </Button>

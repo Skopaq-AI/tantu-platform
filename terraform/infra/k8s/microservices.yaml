@@ -1,5 +1,7 @@
 # TANTU downstream microservices — dev
-# Images: asia-south1-docker.pkg.dev/tantu-beta-20260821-01/tantu/<service>:latest
+# Images pinned by digest: asia-south1-docker.pkg.dev/tantu-beta-20260821-01/tantu/<service>:v0.9.0@sha256:<digest>
+# Build-time: Cloud Build pushes :<commit-sha> and :<version>; k8s manifests reference immutable digest.
+# Update digests after each release: `gcloud artifacts docker images describe <image>:<tag> --show-package-vulnerability` or `crane digest`.
 ---
 apiVersion: v1
 kind: Service
@@ -34,7 +36,7 @@ spec:
     spec:
       containers:
         - name: nats
-          image: nats:2-alpine
+          image: nats:2-alpine@sha256:c0b7e76a6c9c8622af06b363b66446c70ae4c4f7105897de6d77075e8cdd5083 # pinned digest for nats:2-alpine
           args:
             - "-js"
           ports:
@@ -86,8 +88,8 @@ spec:
     spec:
       containers:
         - name: api
-          image: asia-south1-docker.pkg.dev/tantu-beta-20260821-01/tantu/adapter-fabric:latest
-          imagePullPolicy: Always
+          image: asia-south1-docker.pkg.dev/tantu-beta-20260821-01/tantu/adapter-fabric:v0.9.0@sha256:ffb7b4bd8f61df228a99082b3e77e50f08e34526a54604e8444fa8807c0fbf2d
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8001
               name: http
@@ -100,7 +102,7 @@ spec:
             - name: NATS_URL
               value: nats://nats:4222
             - name: REDIS_URL
-              value: redis://10.30.49.75:6378/0
+              value: redis://redis:6379/0 # PVC-backed in-cluster redis (standard-rwo)
           envFrom:
             - secretRef:
                 name: tantu-secrets
@@ -160,8 +162,8 @@ spec:
     spec:
       containers:
         - name: api
-          image: asia-south1-docker.pkg.dev/tantu-beta-20260821-01/tantu/edge-perception:latest
-          imagePullPolicy: Always
+          image: asia-south1-docker.pkg.dev/tantu-beta-20260821-01/tantu/edge-perception:v0.9.0@sha256:1ada7a03b5facb90d01510fefb7a9b7533490c62fadfade2ac15f2f42e08a65a
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8002
               name: http
@@ -229,8 +231,8 @@ spec:
     spec:
       containers:
         - name: api
-          image: asia-south1-docker.pkg.dev/tantu-beta-20260821-01/tantu/reasoning-copilot:latest
-          imagePullPolicy: Always
+          image: asia-south1-docker.pkg.dev/tantu-beta-20260821-01/tantu/reasoning-copilot:v0.9.0@sha256:71bba96d9ee78ddfa07a6cffa332ef03a2636ec7c5528d0ac1e2ac7274e379c7
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8003
               name: http
@@ -308,8 +310,8 @@ spec:
     spec:
       containers:
         - name: api
-          image: asia-south1-docker.pkg.dev/tantu-beta-20260821-01/tantu/orchestrator:latest
-          imagePullPolicy: Always
+          image: asia-south1-docker.pkg.dev/tantu-beta-20260821-01/tantu/orchestrator:v0.9.0@sha256:34d284057b0c322705f6b26d9e377ee48bad1bba8ca6ad06a77668a8882010f2
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8004
               name: http

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 import logging
 from contextlib import asynccontextmanager
@@ -13,7 +14,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from ..infra.config import settings
-from ..infra.security import require_auth, verify_jwt, issue_jwt
+from ..infra.security import require_auth, verify_jwt, issue_jwt, issue_downstream_jwt
 from ..infra.rate_limit import rate_limiter
 from ..infra.downstream import downstream_client
 from ..infra.db import init_db, close_db
@@ -279,33 +280,91 @@ class OnboardResponse(BaseModel):
     tier: str
 
 
+# -- Onboard helpers --
+_ALLOWED_PROTOCOLS = {"opcua", "modbus", "mqtt", "mtconnect", "ethernet_ip", "camera"}
+_ADAPTER_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-_]{1,63}$")
+
+
+def _sanitize_adapter_id(raw: str) -> str:
+    """Sanitize adapter_id to match adapter-fabric pattern."""
+    # lower, replace invalid chars with '-'
+    sanitized = re.sub(r"[^a-z0-9\-_]", "-", raw.lower())
+    # collapse multiple dashes
+    sanitized = re.sub(r"-+", "-", sanitized)
+    sanitized = sanitized.strip("-_")
+    # ensure starts with alnum
+    if not sanitized or not sanitized[0].isalnum():
+        sanitized = "a-" + sanitized
+    # truncate to 64
+    sanitized = sanitized[:64].rstrip("-_")
+    if len(sanitized) < 2:
+        sanitized = sanitized.ljust(2, "a")
+    # final fallback if still invalid
+    if not _ADAPTER_ID_RE.match(sanitized):
+        # hash fallback
+        import hashlib
+        h = hashlib.sha1(raw.encode()).hexdigest()[:8]
+        sanitized = f"adapter-{h}"
+    return sanitized
+
+
+def _downstream_headers(request: Request, plant_id: str, claims: dict) -> dict[str, str]:
+    """Build auth + tracing headers for adapter-fabric calls."""
+    # Use HS256 downstream token for adapter-fabric interop regardless of gateway RS256 mode
+    token = issue_downstream_jwt(
+        sub=str(claims.get("sub", "onboard")),
+        plant_id=plant_id,
+        role=str(claims.get("role", "ORG_ADMIN")),
+        exp_min=5,
+    )
+    hdrs: dict[str, str] = {"Authorization": f"Bearer {token}"}
+    # propagate request id for tracing
+    req_id = getattr(request.state, "request_id", None) or request.headers.get("x-request-id")
+    if req_id:
+        hdrs["X-Request-Id"] = req_id
+    # plant scope header for downstream ABAC fallback
+    hdrs["X-Plant-Id"] = plant_id
+    return hdrs
+
+
 @app.post("/onboard", tags=["onboard"], summary="Plug-and-play onboard — register plant devices in one call")
-async def onboard(body: OnboardRequest, claims: dict = Depends(require_auth)):
+async def onboard(request: Request, body: OnboardRequest, claims: dict = Depends(require_auth)):
     # RBAC: only ORG_ADMIN / OWNER / PLANT_HEAD can onboard
     principal = _claims_to_principal(claims)
-    if principal.role not in ("ORG_ADMIN", "OWNER", "ORG_OWNER", "PLATFORM_SUPER_ADMIN", "PLANT_HEAD", "ADMIN"):
+    if principal.role not in ("ORG_ADMIN", "OWNER", "ORG_OWNER", "PLATFORM_SUPER_ADMIN", "PLANT_HEAD", "ADMIN", "platform_super_admin", "org_owner", "org_admin", "plant_head", "admin", "owner"):
         raise HTTPException(status_code=403, detail="onboard requires ORG_ADMIN/PLANT_HEAD")
     # ABAC: must be in plant scope — allow if super admin or same plant or wildcard
     allowed_plant = claims.get("plant_id")
-    plant_ids = claims.get("plant_ids") or []
-    if body.plant_id not in (allowed_plant, *plant_ids) and "*" not in plant_ids and claims.get("role") not in ("PLATFORM_SUPER_ADMIN", "ORG_OWNER", "ORG_ADMIN", "ADMIN"):
+    plant_ids = claims.get("plant_ids") or claims.get("plantIds") or []
+    # Also check roles array if present (backend issues roles)
+    claim_roles = claims.get("roles") or []
+    role_check = claims.get("role") or (claim_roles[0] if claim_roles else "")
+    privileged = role_check in ("PLATFORM_SUPER_ADMIN", "ORG_OWNER", "ORG_ADMIN", "ADMIN", "platform_super_admin", "org_owner", "org_admin", "admin")
+    if body.plant_id not in (allowed_plant, *plant_ids) and "*" not in plant_ids and not privileged:
         # also allow if no plant_ids restriction (legacy)
         if plant_ids:
             raise HTTPException(status_code=403, detail=f"ABAC plant deny: {body.plant_id}")
+    # Validate devices not empty
+    if not body.devices:
+        raise HTTPException(status_code=422, detail="onboard requires at least one device")
     registered: list[dict[str, Any]] = []
     failed: list[dict[str, Any]] = []
-    # Call adapter-fabric for each device via downstream_client
     import httpx
 
     base = settings.adapter_fabric_url.rstrip("/")
-    headers = {"Authorization": f"Bearer {issue_jwt(claims.get('sub','onboard'), body.plant_id, claims.get('role','ORG_ADMIN'), exp_min=5)}"}
-    # Use service account token for internal call - re-issue with same claims
-    async with httpx.AsyncClient(timeout=5.0) as client:
+    headers = _downstream_headers(request, body.plant_id, claims)
+    timeout = settings.downstream_timeout_s
+    async with httpx.AsyncClient(timeout=timeout) as client:
         for dev in body.devices:
-            adapter_id = f"{body.plant_id}-{dev.station_id}-{dev.protocol}"
+            proto = dev.protocol.lower().strip()
+            if proto not in _ALLOWED_PROTOCOLS:
+                failed.append({"adapter_id": f"{body.plant_id}-{dev.station_id}-{proto}", "error": f"unsupported protocol: {dev.protocol}. allowed: {sorted(_ALLOWED_PROTOCOLS)}"})
+                continue
+            raw_id = f"{body.plant_id}-{dev.station_id}-{proto}"
+            adapter_id = _sanitize_adapter_id(raw_id)
             payload = {
                 "adapter_id": adapter_id,
-                "protocol": dev.protocol.lower(),
+                "protocol": proto,
                 "station_id": dev.station_id,
                 "enabled": True,
                 "poll_interval_ms": dev.poll_interval_ms,
@@ -315,56 +374,77 @@ async def onboard(body: OnboardRequest, claims: dict = Depends(require_auth)):
             try:
                 r = await client.post(f"{base}/adapters", json=payload, headers=headers)
                 if r.status_code in (200, 201):
-                    registered.append({"adapter_id": adapter_id, "protocol": dev.protocol, "status": r.json().get("status", "ok")})
+                    try:
+                        j = r.json()
+                    except Exception:
+                        j = {}
+                    registered.append({"adapter_id": adapter_id, "protocol": proto, "status": j.get("status", "ok")})
                 else:
-                    failed.append({"adapter_id": adapter_id, "error": r.text[:300]})
+                    # include status code and truncated body
+                    err_body = r.text[:500]
+                    failed.append({"adapter_id": adapter_id, "error": f"{r.status_code}: {err_body}", "status_code": r.status_code})
+            except httpx.TimeoutException as e:
+                failed.append({"adapter_id": adapter_id, "error": f"timeout: {e}"[:500]})
+            except httpx.ConnectError as e:
+                failed.append({"adapter_id": adapter_id, "error": f"downstream unreachable: {e}"[:500]})
             except Exception as e:
-                failed.append({"adapter_id": adapter_id, "error": str(e)[:300]})
-    # Also ensure tier is recorded (edge-perception)
-    try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
-            await client.post(f"{settings.edge_perception_url.rstrip('/')}/tier", json={"tier": body.tier}, headers=headers)
-    except Exception:
-        pass
+                failed.append({"adapter_id": adapter_id, "error": str(e)[:500]})
+    # Tier forwarding removed — edge-perception has no /tier endpoint; tier is informational in OnboardResponse.
+    # If edge-perception later exposes a tier config endpoint, add it behind feature flag.
     return OnboardResponse(plant_id=body.plant_id, registered=registered, failed=failed, tier=body.tier)
 
 
 @app.get("/onboard", tags=["onboard"], summary="List onboarded adapters — use POST /onboard to register")
-async def onboard_list(plant_id: str, claims: dict = Depends(require_auth)):
-    # Fix for GET /onboard returning 405 — return helpful list instead of Method Not Allowed
+async def onboard_list(request: Request, plant_id: str, claims: dict = Depends(require_auth)):
+    # Returns live adapters from adapter-fabric filtered by plant_id prefix.
     import httpx
 
     base = settings.adapter_fabric_url.rstrip("/")
-    token = issue_jwt(claims.get("sub", "onboard-list"), plant_id, claims.get("role", "ORG_ADMIN"), exp_min=5)
+    headers = _downstream_headers(request, plant_id, claims)
     live: list = []
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            r = await client.get(f"{base}/adapters", headers={"Authorization": f"Bearer {token}"})
+        async with httpx.AsyncClient(timeout=settings.downstream_timeout_s) as client:
+            r = await client.get(f"{base}/adapters", headers=headers)
             if r.status_code == 200:
-                live = r.json()
-                # filter by plant_id prefix if needed
-                live = [a for a in live if a.get("adapter_id", "").startswith(plant_id) or a.get("station_id") or True]
+                try:
+                    data = r.json()
+                except Exception:
+                    data = []
+                if isinstance(data, list):
+                    # Filter by plant_id prefix — adapter_ids are sanitized as {plant_id}-{station}-{protocol}
+                    prefix = _sanitize_adapter_id(plant_id).lower()
+                    # also try raw plant_id prefix for compat
+                    filtered = [a for a in data if str(a.get("adapter_id", "")).lower().startswith(prefix) or str(a.get("adapter_id", "")).lower().startswith(plant_id.lower())]
+                    # If filtering yields results, return filtered; otherwise return all (prefix mismatch due to sanitization legacy)
+                    live = filtered if filtered else data
+                else:
+                    live = []
+            else:
+                # downstream error — return empty but include hint
+                live = []
+    except httpx.TimeoutException:
+        live = []
     except Exception:
         live = []
     return {"plant_id": plant_id, "live_adapters": live, "hint": "POST /onboard with plant_id + devices[] to register", "discover": f"GET /onboard/discover?plant_id={plant_id}&subnet=192.168.1.0/24"}
 
 
 @app.get("/onboard/discover", tags=["onboard"], summary="Discover devices on plant network (mDNS/Modbus scan)")
-async def discover(plant_id: str, subnet: str = "192.168.1.0/24", claims: dict = Depends(require_auth)):
+async def discover(request: Request, plant_id: str, subnet: str = "192.168.1.0/24", claims: dict = Depends(require_auth)):
     # Real discovery via adapter-fabric (mDNS _opcua-tcp._tcp.local + asyncua find_servers + 502 SYN scan)
     import httpx
 
     base = settings.adapter_fabric_url.rstrip("/")
     live: list = []
     discovered: list = []
+    headers = _downstream_headers(request, plant_id, claims)
     # Try real discovery via adapter-fabric
     try:
-        async with httpx.AsyncClient(timeout=6.0) as client:
-            token = issue_jwt(claims.get("sub", "discover"), plant_id, claims.get("role", "ORG_ADMIN"), exp_min=5)
+        async with httpx.AsyncClient(timeout=max(6.0, settings.downstream_timeout_s)) as client:
             # Prefer adapter-fabric real discover
             for path in (f"{base}/onboard/discover?plant_id={plant_id}&subnet={subnet}", f"{base}/discover?subnet={subnet}"):
                 try:
-                    r = await client.get(path, headers={"Authorization": f"Bearer {token}"})
+                    r = await client.get(path, headers=headers)
                     if r.status_code == 200:
                         j = r.json()
                         discovered = j.get("discovered") or j.get("discovered", [])
@@ -372,7 +452,7 @@ async def discover(plant_id: str, subnet: str = "192.168.1.0/24", claims: dict =
                         # also fetch live_adapters if not in response
                         if not live:
                             try:
-                                r2 = await client.get(f"{base}/adapters", headers={"Authorization": f"Bearer {token}"})
+                                r2 = await client.get(f"{base}/adapters", headers=headers)
                                 if r2.status_code == 200:
                                     live = r2.json()
                             except Exception:
@@ -384,7 +464,7 @@ async def discover(plant_id: str, subnet: str = "192.168.1.0/24", claims: dict =
             # fallback live fetch if still empty
             if not live:
                 try:
-                    r = await client.get(f"{base}/adapters", headers={"Authorization": f"Bearer {token}"})
+                    r = await client.get(f"{base}/adapters", headers=headers)
                     if r.status_code == 200:
                         live = r.json()
                 except Exception:
@@ -415,23 +495,34 @@ async def discover(plant_id: str, subnet: str = "192.168.1.0/24", claims: dict =
 
 
 def _claims_to_principal(claims: dict) -> Principal:
+    # Support both single 'role' and 'roles' array (backend issues roles: [...])
+    role_val = claims.get("role")
+    if not role_val:
+        roles = claims.get("roles") or []
+        if isinstance(roles, list) and roles:
+            role_val = roles[0]
+        else:
+            role_val = ""
     extra = {
         k: v
         for k, v in claims.items()
-        if k not in ("sub", "plant_id", "role", "exp", "iat", "iss", "aud", "jti", "scopes")
+        if k not in ("sub", "plant_id", "role", "roles", "exp", "iat", "iss", "aud", "jti", "scopes")
     }
+    # propagate roles into extra for ABAC checks that inspect roles array
+    if claims.get("roles"):
+        extra["roles"] = claims.get("roles")
     scopes = tuple(claims.get("scopes", [])) if isinstance(claims.get("scopes"), list) else ()
     return Principal(
         sub=str(claims.get("sub", "")),
-        plant_id=str(claims.get("plant_id", "")),
-        role=str(claims.get("role", "")),
+        plant_id=str(claims.get("plant_id", "") or claims.get("plantIds", "")),
+        role=str(role_val or ""),
         scopes=scopes,
         extra=extra,
     )
 
 
 def _extract_plant_id(request: Request, claims: dict) -> Optional[str]:
-    """ABAC plant scope extraction — header, query, or body field, else claims plant_id for writes."""
+    """ABAC plant scope extraction - header, query, or body field, else claims plant_id for writes."""
     # Header takes precedence
     pid = request.headers.get("x-plant-id") or request.headers.get("X-Plant-Id")
     if pid:

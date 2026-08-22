@@ -13,7 +13,8 @@ spec:
     spec:
       containers:
         - name: web
-          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}{{ if .Values.frontend.image.digest }}@{{ .Values.frontend.image.digest }}{{ end }}"
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy | default "IfNotPresent" }}
           ports: [{ containerPort: 3000 }, { containerPort: 8080 }]
           resources: {{- toYaml .Values.frontend.resources | nindent 12 }}
           securityContext: { runAsNonRoot: false, readOnlyRootFilesystem: false, allowPrivilegeEscalation: false }

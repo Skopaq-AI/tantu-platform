@@ -41,7 +41,10 @@ frontend:
 
 qdrant:
   replicaCount: 1
-  persistence: { size: 10Gi }
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: standard-rwo
 
 argoRollouts:
   analysis:

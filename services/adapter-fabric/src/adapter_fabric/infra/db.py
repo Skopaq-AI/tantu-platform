@@ -65,24 +65,25 @@ def _create_engine(url: Optional[str] = None) -> AsyncEngine:
 
 def get_engine(url: Optional[str] = None) -> AsyncEngine:
     global _engine, _engine_url
-    requested = _normalize_url(url) if url else None
-    if _engine is not None and requested is not None and _engine_url is not None and requested != _engine_url:
-        # caller wants different DB – recreate (best-effort)
-        try:
-            pass
-        except Exception:
-            pass
-        _engine = _create_engine(url)
+    requested = _normalize_url(url) if url else _normalize_url(settings.database_url)
+    if _engine is not None and _engine_url is not None and requested != _engine_url:
+        # caller wants different DB – recreate (old engine left to be GC'd / async dispose via close_db)
+        _engine = _create_engine(url if url is not None else requested)
         _engine_url = requested
         return _engine
     if _engine is None:
         _engine = _create_engine(url)
-        _engine_url = _normalize_url(url) if url else _normalize_url(settings.database_url)
+        _engine_url = requested
     return _engine
 
 
 def get_sessionmaker(url: Optional[str] = None) -> async_sessionmaker[AsyncSession]:
-    global _Session
+    global _Session, _engine_url
+    requested = _normalize_url(url) if url else _normalize_url(settings.database_url)
+    # recreate Session if engine URL changed or Session missing
+    if _Session is not None and _engine_url is not None and requested != _engine_url:
+        # engine will be recreated inside get_engine; drop cached Session so it rebinds
+        _Session = None
     if _Session is None:
         _Session = async_sessionmaker(get_engine(url), expire_on_commit=False, class_=AsyncSession)
     return _Session

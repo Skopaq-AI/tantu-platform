@@ -49,7 +49,7 @@ spec:
       serviceAccountName: api
       containers:
         - name: api
-          image: asia-south1-docker.pkg.dev/PROJECT_ID/tantu/backend:latest
+          image: asia-south1-docker.pkg.dev/PROJECT_ID/tantu/backend:v0.9.0@sha256:82811da871b677315d6273a9724e7adc56645e0eb0f15d9075520a920fae6d17 # pinned digest
           ports: [{ containerPort: 8000, name: http }]
           envFrom: [{ secretRef: { name: tantu-secrets } }]
           livenessProbe: { httpGet: { path: /health, port: 8000 }, initialDelaySeconds: 10 }
