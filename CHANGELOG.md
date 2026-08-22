@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.8.2...v) (2026-08-21)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.9.0...v) (2026-08-22)
+
+
+### Bug Fixes
+
+* **gateway:** GET /onboard now lists adapters instead of 405 Method Not Allowed ([22c0229](https://github.com/Skopaq-AI/tantu-platform/commit/22c02295562ce96b748339ce98997994516a411d))
+
+# [0.9.0](https://github.com/Skopaq-AI/tantu-platform/compare/v0.8.2...v0.9.0) (2026-08-21)
 
 
 ### Features
