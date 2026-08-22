@@ -1,4 +1,12 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.9.0...v) (2026-08-22)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.9.1...v) (2026-08-22)
+
+
+### Bug Fixes
+
+* **tests:** keep api.test mocked but gate demo, preserve coverage ([bc84610](https://github.com/Skopaq-AI/tantu-platform/commit/bc84610ffcf2f1e5eb491b1d3c31be5d59059369))
+* **wiring:** deep audit across all layers — role landing redirect, mock gating behind DEMO, API_URL, adapter dual-write, gateway RBAC, infra secrets ([507ec5c](https://github.com/Skopaq-AI/tantu-platform/commit/507ec5c88df1db9374720342b629a0fa9f0e7654))
+
+## [0.9.1](https://github.com/Skopaq-AI/tantu-platform/compare/v0.9.0...v0.9.1) (2026-08-22)
 
 
 ### Bug Fixes
