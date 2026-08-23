@@ -26,6 +26,8 @@ resource "google_project_iam_member" "deployer_roles" {
     "roles/iam.workloadIdentityPoolAdmin",
     "roles/resourcemanager.projectIamAdmin",
     "roles/serviceusage.serviceUsageAdmin",
+    "roles/servicenetworking.admin",
+    "roles/redis.admin",
   ])
   project = var.project_id
   role    = each.value

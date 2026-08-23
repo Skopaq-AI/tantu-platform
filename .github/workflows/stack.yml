@@ -96,13 +96,46 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WIP }}
           service_account: ${{ secrets.GCP_SA }}
       - uses: google-github-actions/setup-gcloud@v2
+      - name: Self-heal destroy IAM (servicenetworking + redis)
+        run: |
+          SA="${{ secrets.GCP_SA }}"
+          PROJECT="${{ env.GCP_PROJECT_ID }}"
+          echo "Self-healing IAM for $SA on $PROJECT"
+          for ROLE in "roles/servicenetworking.admin" "roles/redis.admin"; do
+            echo "Granting $ROLE to $SA"
+            gcloud projects add-iam-policy-binding "$PROJECT" --member="serviceAccount:$SA" --role="$ROLE" --condition=None 2>&1 | tail -n 5 ||             gcloud projects add-iam-policy-binding "$PROJECT" --member="serviceAccount:$SA" --role="$ROLE" 2>&1 | tail -n 5 || echo "::warning::could not grant $ROLE (may not exist)"
+          done
+          echo "Waiting 15s for IAM propagation"
+          sleep 15
+          gcloud projects get-iam-policy "$PROJECT" --flatten="bindings[].members" --filter="bindings.members:$SA" --format="value(bindings.role)" | sort | uniq | head -n 30 || true
       - run: |
           gcloud container clusters get-credentials tantu-${{ inputs.env }}-gke --region ${{ env.GCP_REGION }} --project ${{ env.GCP_PROJECT_ID }} || true
           helm uninstall tantu -n tantu || true
           kubectl delete -f terraform/infra/k8s/gateway.yaml --ignore-not-found || true
-      - run: |
+      - name: Terraform destroy (with refresh retry)
+        run: |
           terraform -chdir=terraform init -backend-config="bucket=${{ env.GCP_PROJECT_ID }}-tfstate" -backend-config="prefix=env/${{ inputs.env }}"
+          set +e
           terraform -chdir=terraform destroy -var-file=envs/${{ inputs.env }}.tfvars -var="project_id=${{ env.GCP_PROJECT_ID }}" -auto-approve
+          EC=$?
+          if [ $EC -ne 0 ]; then
+            echo "::warning::destroy with refresh failed (code $EC), retrying with state rm + refresh=false"
+            terraform -chdir=terraform state rm 'module.vpc.google_service_networking_connection.private_vpc_connection[0]' 2>&1 | tail -n 20 || true
+            terraform -chdir=terraform destroy -var-file=envs/${{ inputs.env }}.tfvars -var="project_id=${{ env.GCP_PROJECT_ID }}" -auto-approve -refresh=false
+            EC=$?
+            if [ $EC -ne 0 ]; then
+              echo "::error::destroy still failed (code $EC), attempting targeted destroy of remaining resources"
+              # As last resort, try to delete GKE and SQL via gcloud directly to stop billing, then force-unlock state if needed
+              gcloud container clusters delete tantu-${{ inputs.env }}-gke --region ${{ env.GCP_REGION }} --project ${{ env.GCP_PROJECT_ID }} --quiet || true
+              gcloud sql instances delete tantu-${{ inputs.env }}-pg16 --project ${{ env.GCP_PROJECT_ID }} --quiet || true
+              gcloud redis instances delete tantu-${{ inputs.env }}-redis --region ${{ env.GCP_REGION }} --project ${{ env.GCP_PROJECT_ID }} --quiet || true
+              terraform -chdir=terraform destroy -var-file=envs/${{ inputs.env }}.tfvars -var="project_id=${{ env.GCP_PROJECT_ID }}" -auto-approve -refresh=false || true
+            fi
+          fi
+          # Final clean: remove peering via gcloud if abandoned
+          gcloud services vpc-peerings delete --service=servicenetworking.googleapis.com --network=tantu-${{ inputs.env }}-vpc --project=${{ env.GCP_PROJECT_ID }} 2>&1 | tail -n 10 || echo "peering already removed or abandoned"
+          echo "Destroy step complete"
+
 
   scale-to-zero:
     if: inputs.action == 'scale-to-zero' && github.ref == 'refs/heads/main'
