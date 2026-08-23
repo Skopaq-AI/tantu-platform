@@ -1,0 +1,128 @@
+name: Stack — Up / Down
+
+# Dedicated pipeline to bring the entire TANTU stack up or down via IaC.
+# Uses the existing terraform + helm + k8s manifests.
+# Trigger: manual only (workflow_dispatch) to avoid accidental destroy on push.
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Stack action"
+        required: true
+        default: plan
+        type: choice
+        options: [plan, apply, destroy, scale-to-zero]
+      env:
+        description: "Environment"
+        required: true
+        default: dev
+        type: choice
+        options: [dev, prod]
+      confirm_destroy:
+        description: 'Type "destroy" to confirm destroy/scale-to-zero'
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+env:
+  TF_VERSION: "1.6.6"
+  GCP_REGION: ${{ vars.GCP_REGION || 'asia-south1' }}
+  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID || 'tantu-beta-20260821-01' }}
+
+jobs:
+  plan:
+    if: inputs.action == 'plan'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      - run: terraform -chdir=terraform fmt -check || (terraform -chdir=terraform fmt -diff && exit 1)
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIP }}
+          service_account: ${{ secrets.GCP_SA }}
+      - run: |
+          terraform -chdir=terraform init -backend-config="bucket=${{ env.GCP_PROJECT_ID }}-tfstate" -backend-config="prefix=env/${{ inputs.env }}"
+          terraform -chdir=terraform plan -var-file=envs/${{ inputs.env }}.tfvars -var="project_id=${{ env.GCP_PROJECT_ID }}" -out=tfplan
+
+  apply:
+    if: inputs.action == 'apply' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.env }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIP }}
+          service_account: ${{ secrets.GCP_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - run: |
+          terraform -chdir=terraform init -backend-config="bucket=${{ env.GCP_PROJECT_ID }}-tfstate" -backend-config="prefix=env/${{ inputs.env }}"
+          terraform -chdir=terraform apply -var-file=envs/${{ inputs.env }}.tfvars -var="project_id=${{ env.GCP_PROJECT_ID }}" -auto-approve
+      - run: |
+          gcloud container clusters get-credentials tantu-${{ inputs.env }}-gke --region ${{ env.GCP_REGION }} --project ${{ env.GCP_PROJECT_ID }}
+          kubectl apply -f terraform/infra/k8s/redis.yaml
+          helm upgrade --install tantu terraform/infra/k8s/helm/tantu -n tantu --create-namespace -f terraform/infra/k8s/helm/tantu/values-${{ inputs.env }}.yaml
+          kubectl apply -f terraform/infra/k8s/gateway.yaml
+          kubectl apply -f terraform/infra/k8s/vllm.l4.yaml || echo "::warning::vLLM needs GPUS_ALL_REGIONS quota"
+      - run: echo "::notice::Stack UP — Gateway https://console.cloud.google.com/kubernetes/gateway/regions/${{ env.GCP_REGION }}/gateways/tantu-${{ inputs.env }}-gateway?project=${{ env.GCP_PROJECT_ID }}"
+
+  destroy:
+    if: inputs.action == 'destroy' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.env }}
+    steps:
+      - uses: actions/checkout@v4
+      - if: inputs.confirm_destroy != 'destroy'
+        run: |
+          echo "::error::Refusing destroy — confirm_destroy must be exactly 'destroy'"
+          exit 1
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIP }}
+          service_account: ${{ secrets.GCP_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - run: |
+          gcloud container clusters get-credentials tantu-${{ inputs.env }}-gke --region ${{ env.GCP_REGION }} --project ${{ env.GCP_PROJECT_ID }} || true
+          helm uninstall tantu -n tantu || true
+          kubectl delete -f terraform/infra/k8s/gateway.yaml --ignore-not-found || true
+      - run: |
+          terraform -chdir=terraform init -backend-config="bucket=${{ env.GCP_PROJECT_ID }}-tfstate" -backend-config="prefix=env/${{ inputs.env }}"
+          terraform -chdir=terraform destroy -var-file=envs/${{ inputs.env }}.tfvars -var="project_id=${{ env.GCP_PROJECT_ID }}" -auto-approve
+
+  scale-to-zero:
+    if: inputs.action == 'scale-to-zero' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.env }}
+    steps:
+      - uses: actions/checkout@v4
+      - if: inputs.confirm_destroy != 'destroy'
+        run: |
+          echo "::error::Refusing scale-to-zero — confirm_destroy must be exactly 'destroy'"
+          exit 1
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIP }}
+          service_account: ${{ secrets.GCP_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - run: |
+          gcloud container clusters get-credentials tantu-${{ inputs.env }}-gke --region ${{ env.GCP_REGION }} --project ${{ env.GCP_PROJECT_ID }}
+          kubectl scale deployment -n tantu --all --replicas=0 || true
+          kubectl scale rollout -n tantu --all --replicas=0 || true
+          kubectl scale statefulset -n tantu --all --replicas=0 || true
+          gcloud sql instances patch tantu-${{ inputs.env }}-pg16 --activation-policy=NEVER --project ${{ env.GCP_PROJECT_ID }} || true
+          echo "::notice::Stack scaled to zero — GKE workloads 0, CloudSQL NEVER. Resume via workflow_dispatch action=apply or kubectl scale --replicas=1"
