@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.9.2...v) (2026-08-22)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.9.3...v) (2026-08-23)
+
+
+### Features
+
+* **ci:** dedicated Stack Up/Down pipeline — plan/apply/destroy/scale-to-zero via workflow_dispatch ([e99ce6b](https://github.com/Skopaq-AI/tantu-platform/commit/e99ce6b6fce79712047b0b1662f0d9c9d5f5629e))
+
+## [0.9.3](https://github.com/Skopaq-AI/tantu-platform/compare/v0.9.2...v0.9.3) (2026-08-22)
 
 
 ### Bug Fixes
