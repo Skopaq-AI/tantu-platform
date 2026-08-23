@@ -1,4 +1,11 @@
-# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.9.3...v) (2026-08-23)
+# [](https://github.com/Skopaq-AI/tantu-platform/compare/v0.10.0...v) (2026-08-23)
+
+
+### Bug Fixes
+
+* **destroy:** self-heal servicenetworking+redis IAM for deployer and resilient destroy with refresh retry ([6a114a2](https://github.com/Skopaq-AI/tantu-platform/commit/6a114a2d29aa06060d6016ab863a48c797b5d5b6))
+
+# [0.10.0](https://github.com/Skopaq-AI/tantu-platform/compare/v0.9.3...v0.10.0) (2026-08-23)
 
 
 ### Features
